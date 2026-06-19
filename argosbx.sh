@@ -6,6 +6,49 @@ else
 export LANG=C
 unset LC_ALL
 fi
+install_dependencies(){
+[ "$1" = "del" ] && return
+if [ "$(id -u 2>/dev/null)" != "0" ]; then
+echo "当前环境非root用户权限，请先输入 sudo -i 命令"
+exit 1
+fi
+required_deps="curl wget unzip tar gzip openssl awk sed grep find qrencode iptables crontab timeout base64 sha256sum tr head xargs readlink pgrep"
+missing=""
+for cmd in $required_deps; do
+command -v "$cmd" >/dev/null 2>&1 || missing="$missing $cmd"
+done
+[ -f "$HOME/agsbx/.deps_ok" ] && [ -z "$missing" ] && return
+echo "正在检查并安装脚本运行依赖，请稍等..."
+mkdir -p "$HOME/agsbx"
+if command -v apt-get >/dev/null 2>&1; then
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y >/dev/null 2>&1
+printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections 2>/dev/null
+apt-get install -y curl wget ca-certificates bash busybox coreutils util-linux procps iproute2 iptables iptables-persistent cron openssl unzip tar gzip qrencode findutils grep sed gawk xz-utils >/dev/null 2>&1
+elif command -v apk >/dev/null 2>&1; then
+apk update >/dev/null 2>&1
+apk add --no-cache curl wget ca-certificates bash busybox-extras gcompat libc6-compat coreutils util-linux procps iproute2 iptables ip6tables openrc dcron openssl unzip tar gzip qrencode findutils grep sed gawk xz >/dev/null 2>&1
+elif command -v dnf >/dev/null 2>&1; then
+dnf install -y curl wget ca-certificates bash coreutils util-linux procps-ng iproute iptables iptables-services cronie openssl unzip tar gzip qrencode findutils grep sed gawk xz >/dev/null 2>&1
+elif command -v yum >/dev/null 2>&1; then
+yum install -y curl wget ca-certificates bash coreutils util-linux procps-ng iproute iptables iptables-services cronie openssl unzip tar gzip qrencode findutils grep sed gawk xz >/dev/null 2>&1
+else
+echo "未识别系统包管理器，请先手动安装 curl/wget/unzip/tar/openssl/iptables/qrencode 等依赖。"
+exit 1
+fi
+missing=""
+for cmd in $required_deps; do
+command -v "$cmd" >/dev/null 2>&1 || missing="$missing $cmd"
+done
+if [ -n "$missing" ]; then
+echo "依赖安装不完整，缺少命令:$missing"
+echo "请检查系统软件源是否可用，然后重新运行脚本。"
+exit 1
+fi
+touch "$HOME/agsbx/.deps_ok"
+echo "依赖检查完成。"
+}
+install_dependencies "$1"
 [ -z "${vlpt+x}" ] || vlp=yes
 [ -z "${vmpt+x}" ] || { vmp=yes; vmag=yes; }
 [ -z "${vwpt+x}" ] || { vwp=yes; vmag=yes; }
@@ -79,17 +122,7 @@ amd64|x86_64) cpu=amd64;;
 esac
 if [ "$1" != "del" ]; then
 mkdir -p "$HOME/agsbx"
-if [ ! -f sbx_update ]; then
-echo "执行必要的脚本依赖中，请稍等10秒……"
-if command -v apk >/dev/null 2>&1; then
-apk update >/dev/null 2>&1 && apk add --no-cache bash busybox-extras gcompat libc6-compat iptables openssl unzip tar gzip >/dev/null 2>&1
-elif command -v apt >/dev/null 2>&1; then
-export DEBIAN_FRONTEND=noninteractive
-printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections
-apt update >/dev/null 2>&1 && apt install -y busybox coreutils util-linux iptables iptables-persistent cron openssl unzip tar gzip >/dev/null 2>&1
-fi
-touch sbx_update
-fi
+[ -f sbx_update ] || touch sbx_update
 fi
 v4v6(){
 v4=$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k "$v46url" 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -4 --tries=2 -qO- "$v46url" 2>/dev/null) )
