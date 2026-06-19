@@ -68,9 +68,10 @@ agsbx del    # 卸载
 1. 仓库建议保持公开，否则 VPS 无法直接通过 `raw.githubusercontent.com` 拉取脚本。
 2. 默认分支需要是 `main`；如果你改成其他分支，要同步改 `index.html` 和 README 里的 raw 地址。
 3. `argosbx.sh` 第一行必须保持 `#!/bin/sh`，上传时不要用会破坏换行或编码的编辑器。
-4. 脚本会从 `https://github.com/zhonglianidc/proxy/releases/download/argosbx/` 下载 `xray-*`、`sing-box-*` 等内核文件。部署前需要把这些 release 资源上传到你自己的仓库，或运行脚本时设置 `UPSTREAM_RELEASE_BASE` 指向可用资源地址。
-5. 如果启用 CDN 优选相关功能，把 `YOUR_CDN_DOMAIN` 替换为你的优选域名后缀；不用 CDN 优选可忽略。
-6. 修改后可以打开 `index.html`，确认网页生成的命令已经指向 `zhonglianidc/proxy`。
+4. Xray 会自动从 `XTLS/Xray-core` 官方 GitHub Release 下载最新版；Sing-box 会自动从 `SagerNet/sing-box` 官方 GitHub Release 下载最新版；Cloudflared 也使用官方最新版。
+5. VPS 需要能访问 GitHub Release 下载地址，否则内核下载会失败。
+6. 如果启用 CDN 优选相关功能，把 `YOUR_CDN_DOMAIN` 替换为你的优选域名后缀；不用 CDN 优选可忽略。
+7. 修改后可以打开 `index.html`，确认网页生成的命令已经指向 `zhonglianidc/proxy`。
 
 ## Socks5 修改说明
 

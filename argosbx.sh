@@ -44,7 +44,6 @@ SCRIPT_GITHUB_USER=${SCRIPT_GITHUB_USER:-zhonglianidc}
 SCRIPT_GITHUB_REPO=${SCRIPT_GITHUB_REPO:-proxy}
 SCRIPT_GITHUB_BRANCH=${SCRIPT_GITHUB_BRANCH:-main}
 SCRIPT_RAW_BASE=${SCRIPT_RAW_BASE:-https://raw.githubusercontent.com/${SCRIPT_GITHUB_USER}/${SCRIPT_GITHUB_REPO}/${SCRIPT_GITHUB_BRANCH}}
-UPSTREAM_RELEASE_BASE=${UPSTREAM_RELEASE_BASE:-https://github.com/${SCRIPT_GITHUB_USER}/${SCRIPT_GITHUB_REPO}/releases/download/argosbx}
 v46url="https://icanhazip.com"
 agsbxurl="${SCRIPT_RAW_BASE}/argosbx.sh"
 showmode(){
@@ -77,11 +76,11 @@ mkdir -p "$HOME/agsbx"
 if [ ! -f sbx_update ]; then
 echo "执行必要的脚本依赖中，请稍等10秒……"
 if command -v apk >/dev/null 2>&1; then
-apk update >/dev/null 2>&1 && apk add --no-cache bash busybox-extras gcompat libc6-compat iptables openssl >/dev/null 2>&1
+apk update >/dev/null 2>&1 && apk add --no-cache bash busybox-extras gcompat libc6-compat iptables openssl unzip tar gzip >/dev/null 2>&1
 elif command -v apt >/dev/null 2>&1; then
 export DEBIAN_FRONTEND=noninteractive
 printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections
-apt update >/dev/null 2>&1 && apt install -y busybox coreutils util-linux iptables iptables-persistent cron openssl >/dev/null 2>&1
+apt update >/dev/null 2>&1 && apt install -y busybox coreutils util-linux iptables iptables-persistent cron openssl unzip tar gzip >/dev/null 2>&1
 fi
 touch sbx_update
 fi
@@ -159,17 +158,66 @@ case "$warp" in *s6*|x) sbyx='ipv6_only' ;; *) sbyx='prefer_ipv4' ;; esac
 case "$warp" in *x6*) xryx='ForceIPv6' ;; *x*) xryx='ForceIPv4v6' ;; *) xryx='ForceIPv6v4' ;; esac
 fi
 }
+download_file(){
+url="$1"
+out="$2"
+(command -v curl >/dev/null 2>&1 && curl -L -o "$out" -# --retry 2 "$url") || (command -v wget >/dev/null 2>&1 && timeout 120 wget -O "$out" --tries=2 "$url")
+}
+github_latest_asset_url(){
+repo="$1"
+pattern="$2"
+api="https://api.github.com/repos/${repo}/releases/latest"
+json="$HOME/agsbx/latest-$(echo "$repo" | tr '/' '-').json"
+download_file "$api" "$json" >/dev/null 2>&1
+grep -E '"browser_download_url":' "$json" | grep -E "$pattern" | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/' | head -n 1
+}
 upxray(){
-url="${UPSTREAM_RELEASE_BASE}/xray-$cpu"; out="$HOME/agsbx/xray"; (command -v curl >/dev/null 2>&1 && curl -Lo "$out" -# --retry 2 "$url") || (command -v wget>/dev/null 2>&1 && timeout 3 wget -O "$out" --tries=2 "$url")
+case "$cpu" in
+amd64) xray_pattern='Xray-linux-64\.zip$' ;;
+arm64) xray_pattern='Xray-linux-arm64-v8a\.zip$' ;;
+*) echo "Xray暂不支持$(uname -m)架构" && exit 1 ;;
+esac
+url=$(github_latest_asset_url "XTLS/Xray-core" "$xray_pattern")
+[ -z "$url" ] && echo "未找到Xray官方最新版下载地址" && exit 1
+tmpdir="$HOME/agsbx/xray_tmp"
+rm -rf "$tmpdir" && mkdir -p "$tmpdir"
+archive="$tmpdir/xray.zip"
+echo "下载Xray官方最新版内核：$url"
+download_file "$url" "$archive" || { echo "Xray下载失败"; exit 1; }
+unzip -o -q "$archive" -d "$tmpdir" || { echo "Xray解压失败"; exit 1; }
+[ -f "$tmpdir/xray" ] || { echo "Xray压缩包内未找到xray文件"; exit 1; }
+mv -f "$tmpdir/xray" "$HOME/agsbx/xray"
 chmod +x "$HOME/agsbx/xray"
+rm -rf "$tmpdir"
 sbcore=$("$HOME/agsbx/xray" version 2>/dev/null | awk '/^Xray/{print $2}')
-echo "已安装Xray正式版内核：$sbcore"
+echo "已安装Xray官方最新版内核：$sbcore"
 }
 upsingbox(){
-url="${UPSTREAM_RELEASE_BASE}/sing-box-$cpu"; out="$HOME/agsbx/sing-box"; (command -v curl>/dev/null 2>&1 && curl -Lo "$out" -# --retry 2 "$url") || (command -v wget>/dev/null 2>&1 && timeout 3 wget -O "$out" --tries=2 "$url")
+case "$cpu" in
+amd64|arm64)
+if command -v apk >/dev/null 2>&1; then
+singbox_pattern="sing-box-[0-9.]+-linux-${cpu}-musl\\.tar\\.gz$"
+else
+singbox_pattern="sing-box-[0-9.]+-linux-${cpu}\\.tar\\.gz$"
+fi
+;;
+*) echo "Sing-box暂不支持$(uname -m)架构" && exit 1 ;;
+esac
+url=$(github_latest_asset_url "SagerNet/sing-box" "$singbox_pattern")
+[ -z "$url" ] && echo "未找到Sing-box官方最新版下载地址" && exit 1
+tmpdir="$HOME/agsbx/singbox_tmp"
+rm -rf "$tmpdir" && mkdir -p "$tmpdir"
+archive="$tmpdir/sing-box.tar.gz"
+echo "下载Sing-box官方最新版内核：$url"
+download_file "$url" "$archive" || { echo "Sing-box下载失败"; exit 1; }
+tar -xzf "$archive" -C "$tmpdir" || { echo "Sing-box解压失败"; exit 1; }
+bin=$(find "$tmpdir" -type f -name sing-box | head -n 1)
+[ -n "$bin" ] || { echo "Sing-box压缩包内未找到sing-box文件"; exit 1; }
+mv -f "$bin" "$HOME/agsbx/sing-box"
 chmod +x "$HOME/agsbx/sing-box"
+rm -rf "$tmpdir"
 sbcore=$("$HOME/agsbx/sing-box" version 2>/dev/null | awk '/version/{print $NF}')
-echo "已安装Sing-box正式版内核：$sbcore"
+echo "已安装Sing-box官方最新版内核：$sbcore"
 }
 insuuid(){
 if [ -z "$uuid" ] && [ ! -e "$HOME/agsbx/uuid" ]; then
@@ -473,8 +521,6 @@ if [ ! -f "$HOME/agsbx/SHA256.txt" ]; then
 command -v openssl >/dev/null 2>&1 && openssl ecparam -genkey -name prime256v1 -out "$HOME/agsbx/private.key" >/dev/null 2>&1
 command -v openssl >/dev/null 2>&1 && openssl req -new -x509 -days 36500 -key "$HOME/agsbx/private.key" -out "$HOME/agsbx/cert.crt" -subj "/CN=www.bing.com" >/dev/null 2>&1
 #if [ ! -f "$HOME/agsbx/private.key" ]; then
-#url="${UPSTREAM_RELEASE_BASE}/private.key"; out="$HOME/agsbx/private.key"; (command -v curl>/dev/null 2>&1 && curl -Ls -o "$out" --retry 2 "$url") || (command -v wget>/dev/null 2>&1 && timeout 3 wget -q -O "$out" --tries=2 "$url")
-#url="${UPSTREAM_RELEASE_BASE}/cert.crt"; out="$HOME/agsbx/cert.crt"; (command -v curl>/dev/null 2>&1 && curl -Ls -o "$out" --retry 2 "$url") || (command -v wget>/dev/null 2>&1 && timeout 3 wget -q -O "$out" --tries=2 "$url")
 #echo "fc6dca8cfc4081102aa9655d0d4805c27d7266f605541d242ad66ad00a284a35" > "$HOME/agsbx/SHA256.txt"
 #else
 SHA256=$(openssl x509 -in $HOME/agsbx/cert.crt -outform DER | sha256sum | awk '{print $1}')
