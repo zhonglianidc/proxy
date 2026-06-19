@@ -4,7 +4,7 @@
 
 ## 文件说明
 
-- `argosbx.sh`：VPS 主脚本。
+- `proxy.sh`：VPS 主脚本。
 - `index.html`：网页命令生成器，用来勾选协议并复制 SSH 命令。
 - `LICENSE`：原项目许可证。
 
@@ -13,25 +13,25 @@
 默认主脚本：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/argosbx.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)
 ```
 
 如果服务器没有 `curl`，使用：
 
 ```bash
-bash <(wget -qO- https://raw.githubusercontent.com/zhonglianidc/proxy/main/argosbx.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)
 ```
 
 至少选择一个协议变量，例如：
 
 ```bash
-sopt="" bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/argosbx.sh)
+sopt="" bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)
 ```
 
 多个协议组合示例：
 
 ```bash
-vmpt="" vwpt="" sopt="" sspt="" bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/argosbx.sh)
+vmpt="" vwpt="" sopt="" sspt="" bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)
 ```
 
 ## 常用协议变量
@@ -55,19 +55,19 @@ vmpt="" vwpt="" sopt="" sspt="" bash <(curl -Ls https://raw.githubusercontent.co
 首次安装后重新连接 SSH，快捷命令才会生效。
 
 ```bash
-agsbx list   # 显示节点
-agsbx rep    # 按新变量重置/更新配置
-agsbx res    # 重启脚本服务
-agsbx upx    # 更新 Xray 内核
-agsbx ups    # 更新 Sing-box 内核
-agsbx del    # 卸载
+proxy list   # 显示节点
+proxy rep    # 按新变量重置/更新配置
+proxy res    # 重启脚本服务
+proxy upx    # 更新 Xray 内核
+proxy ups    # 更新 Sing-box 内核
+proxy del    # 卸载
 ```
 
 ## GitHub 部署注意事项
 
 1. 仓库建议保持公开，否则 VPS 无法直接通过 `raw.githubusercontent.com` 拉取脚本。
 2. 默认分支需要是 `main`；如果你改成其他分支，要同步改 `index.html` 和 README 里的 raw 地址。
-3. `argosbx.sh` 第一行必须保持 `#!/bin/sh`，上传时不要用会破坏换行或编码的编辑器。
+3. `proxy.sh` 第一行必须保持 `#!/bin/sh`，上传时不要用会破坏换行或编码的编辑器。
 4. Xray 会自动从 `XTLS/Xray-core` 官方 GitHub Release 下载最新版；Sing-box 会自动从 `SagerNet/sing-box` 官方 GitHub Release 下载最新版；Cloudflared 也使用官方最新版。
 5. VPS 需要能访问 GitHub Release 下载地址，否则内核下载会失败。
 6. 如果启用 CDN 优选相关功能，把 `YOUR_CDN_DOMAIN` 替换为你的优选域名后缀；不用 CDN 优选可忽略。
