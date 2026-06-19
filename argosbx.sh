@@ -303,7 +303,7 @@ dnf install -y qrencode >/dev/null 2>&1
 fi
 fi
 if command -v qrencode >/dev/null 2>&1; then
-qrencode -t UTF8 -m 1 -v 15 "$qrtext" 2>/dev/null || qrencode -t UTF8 -m 1 "$qrtext"
+qrencode -t ANSIUTF8 -m 0 -v 15 "$qrtext" 2>/dev/null || qrencode -t ANSIUTF8 -m 0 "$qrtext" 2>/dev/null || qrencode -t UTF8 -m 0 "$qrtext"
 else
 echo "qrencode is not installed, QR code cannot be shown in terminal."
 fi
