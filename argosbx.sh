@@ -163,22 +163,26 @@ url="$1"
 out="$2"
 (command -v curl >/dev/null 2>&1 && curl -L -o "$out" -# --retry 2 "$url") || (command -v wget >/dev/null 2>&1 && timeout 120 wget -O "$out" --tries=2 "$url")
 }
-github_latest_asset_url(){
+github_latest_tag(){
 repo="$1"
-pattern="$2"
 api="https://api.github.com/repos/${repo}/releases/latest"
 json="$HOME/agsbx/latest-$(echo "$repo" | tr '/' '-').json"
 download_file "$api" "$json" >/dev/null 2>&1
-grep -E '"browser_download_url":' "$json" | grep -E "$pattern" | sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/' | head -n 1
+tag=$(grep -m 1 '"tag_name":' "$json" | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
+if [ -z "$tag" ] && command -v curl >/dev/null 2>&1; then
+tag=$(curl -Ls -o /dev/null -w '%{url_effective}' "https://github.com/${repo}/releases/latest" | awk -F/ '{print $NF}')
+fi
+echo "$tag"
 }
 upxray(){
 case "$cpu" in
-amd64) xray_pattern='Xray-linux-64\.zip$' ;;
-arm64) xray_pattern='Xray-linux-arm64-v8a\.zip$' ;;
+amd64) xray_file='Xray-linux-64.zip' ;;
+arm64) xray_file='Xray-linux-arm64-v8a.zip' ;;
 *) echo "Xray暂不支持$(uname -m)架构" && exit 1 ;;
 esac
-url=$(github_latest_asset_url "XTLS/Xray-core" "$xray_pattern")
-[ -z "$url" ] && echo "未找到Xray官方最新版下载地址" && exit 1
+xray_tag=$(github_latest_tag "XTLS/Xray-core")
+[ -z "$xray_tag" ] && echo "未找到Xray官方最新版本号" && exit 1
+url="https://github.com/XTLS/Xray-core/releases/download/${xray_tag}/${xray_file}"
 tmpdir="$HOME/agsbx/xray_tmp"
 rm -rf "$tmpdir" && mkdir -p "$tmpdir"
 archive="$tmpdir/xray.zip"
@@ -196,15 +200,17 @@ upsingbox(){
 case "$cpu" in
 amd64|arm64)
 if command -v apk >/dev/null 2>&1; then
-singbox_pattern="sing-box-[0-9.]+-linux-${cpu}-musl\\.tar\\.gz$"
+singbox_suffix="linux-${cpu}-musl"
 else
-singbox_pattern="sing-box-[0-9.]+-linux-${cpu}\\.tar\\.gz$"
+singbox_suffix="linux-${cpu}"
 fi
 ;;
 *) echo "Sing-box暂不支持$(uname -m)架构" && exit 1 ;;
 esac
-url=$(github_latest_asset_url "SagerNet/sing-box" "$singbox_pattern")
-[ -z "$url" ] && echo "未找到Sing-box官方最新版下载地址" && exit 1
+singbox_tag=$(github_latest_tag "SagerNet/sing-box")
+[ -z "$singbox_tag" ] && echo "未找到Sing-box官方最新版本号" && exit 1
+singbox_version=${singbox_tag#v}
+url="https://github.com/SagerNet/sing-box/releases/download/${singbox_tag}/sing-box-${singbox_version}-${singbox_suffix}.tar.gz"
 tmpdir="$HOME/agsbx/singbox_tmp"
 rm -rf "$tmpdir" && mkdir -p "$tmpdir"
 archive="$tmpdir/sing-box.tar.gz"
