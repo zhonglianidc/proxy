@@ -270,7 +270,7 @@ dnf install -y qrencode >/dev/null 2>&1
 fi
 fi
 if command -v qrencode >/dev/null 2>&1; then
-qrencode -t UTF8 "$qrtext"
+qrencode -t UTF8 -m 1 -v 15 "$qrtext" 2>/dev/null || qrencode -t UTF8 -m 1 "$qrtext"
 else
 echo "qrencode is not installed, QR code cannot be shown in terminal."
 fi
@@ -286,7 +286,7 @@ plink_url="$2"
 [ -z "$plink_url" ] && return
 printf '\033[1;33m%s\033[0m\n' "$plink_title"
 printf '\033[0;32m%s\033[0m\n' "$plink_url"
-printf '\033[1;33m%s\033[0m\n' "QR code:"
+printf '\033[1;33m%s\033[0m\n' "二维码："
 showqrcode "$plink_url"
 echo
 }
@@ -1343,20 +1343,20 @@ print_section "Vless XHTTP Reality ENC"
 port_xh=$(cat "$HOME/agsbx/port_xh")
 vl_xh_link="vless://$uuid@$server_ip:$port_xh?encryption=$enkey&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=xhttp&path=$uuid-xh&mode=auto#${sxname}vl-xhttp-reality-enc-$hostname"
 echo "$vl_xh_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$vl_xh_link"
+print_link "分享二维码：" "$vl_xh_link"
 fi
 if grep vless-xhttp "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
 print_section "Vless XHTTP ENC"
 port_vx=$(cat "$HOME/agsbx/port_vx")
 vl_vx_link="vless://$uuid@$server_ip:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&path=$uuid-vx&mode=auto#${sxname}vl-xhttp-enc-$hostname"
 echo "$vl_vx_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$vl_vx_link"
+print_link "分享二维码：" "$vl_vx_link"
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vless XHTTP ENC CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
 vl_vx_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&host=$xvvmcdnym&path=$uuid-vx&mode=auto#${sxname}vl-xhttp-enc-cdn-$hostname"
 echo "$vl_vx_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$vl_vx_cdn_link"
+print_link "分享二维码：" "$vl_vx_cdn_link"
 fi
 fi
 if grep vless-ws "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
@@ -1364,13 +1364,13 @@ print_section "Vless WS ENC"
 port_vw=$(cat "$HOME/agsbx/port_vw")
 vl_vw_link="vless://$uuid@$server_ip:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&path=$uuid-vw#${sxname}vl-ws-enc-$hostname"
 echo "$vl_vw_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$vl_vw_link"
+print_link "分享二维码：" "$vl_vw_link"
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vless WS ENC CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
 vl_vw_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$xvvmcdnym&path=$uuid-vw#${sxname}vl-ws-enc-cdn-$hostname"
 echo "$vl_vw_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$vl_vw_cdn_link"
+print_link "分享二维码：" "$vl_vw_cdn_link"
 fi
 fi
 if grep reality-vision "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
@@ -1378,7 +1378,7 @@ print_section "Vless TCP Reality Vision"
 port_vl_re=$(cat "$HOME/agsbx/port_vl_re")
 vl_link="vless://$uuid@$server_ip:$port_vl_re?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=tcp&headerType=none#${sxname}vl-reality-vision-$hostname"
 echo "$vl_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$vl_link"
+print_link "分享二维码：" "$vl_link"
 sbvlpt(){
 cat <<EOF
     {
@@ -1434,7 +1434,7 @@ print_section "Shadowsocks 2022"
 port_ss=$(cat "$HOME/agsbx/port_ss")
 ss_link="ss://$(echo -n "2022-blake3-aes-128-gcm:$sskey@$server_ip:$port_ss" | base64 -w0)#${sxname}Shadowsocks-2022-$hostname"
 echo "$ss_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$ss_link"
+print_link "分享二维码：" "$ss_link"
 sbsspt(){
 cat <<EOF
 {
@@ -1476,7 +1476,7 @@ print_section "Vmess WS"
 port_vm_ws=$(cat "$HOME/agsbx/port_vm_ws")
 vm_link="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vm-ws-$hostname\", \"add\": \"$server_ip\", \"port\": \"$port_vm_ws\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"www.bing.com\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vm_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$vm_link"
+print_link "分享二维码：" "$vm_link"
 sbvmpt(){
 cat <<EOF
 {
@@ -1538,7 +1538,7 @@ print_section "Vmess WS CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
 vm_cdn_link="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vm-ws-cdn-$hostname\", \"add\": \"cdn$(cfipsj).YOUR_CDN_DOMAIN\", \"port\": \"$port_vm_ws\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$xvvmcdnym\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vm_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$vm_cdn_link"
+print_link "分享二维码：" "$vm_cdn_link"
 fi
 fi
 if grep anytls-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
@@ -1546,7 +1546,7 @@ print_section "AnyTLS"
 port_an=$(cat "$HOME/agsbx/port_an")
 an_link="anytls://$uuid@$server_ip:$port_an?insecure=1&allowInsecure=1#${sxname}anytls-$hostname"
 echo "$an_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$an_link"
+print_link "分享二维码：" "$an_link"
 sbanpt(){
 cat <<EOF
          {
@@ -1593,7 +1593,7 @@ print_section "AnyTLS Reality"
 port_ar=$(cat "$HOME/agsbx/port_ar")
 ar_link="anytls://$uuid@$server_ip:$port_ar?security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_s&sid=$short_id_s&type=tcp&headerType=none#${sxname}any-reality-$hostname"
 echo "$ar_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$ar_link"
+print_link "分享二维码：" "$ar_link"
 sbarpt(){
 cat <<EOF
     {
@@ -1646,7 +1646,7 @@ fi
 #hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1&allowInsecure=1$hyps&sni=www.bing.com#${sxname}hy2-$hostname"
 hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=0&allowInsecure=0$hyps&sni=www.bing.com&pinSHA256=$SHA256#${sxname}hy2-$hostname"
 echo "$hy2_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$hy2_link"
+print_link "分享二维码：" "$hy2_link"
 sbhypt(){
 cat <<EOF
     {
@@ -1694,7 +1694,7 @@ print_section "Tuic"
 port_tu=$(cat "$HOME/agsbx/port_tu")
 tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&insecure=1&allowInsecure=1&allow_insecure=1#${sxname}tuic-$hostname"
 echo "$tuic5_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "Share link:" "$tuic5_link"
+print_link "分享二维码：" "$tuic5_link"
 sbtupt(){
 cat <<EOF
         {
@@ -1750,12 +1750,12 @@ port_so=$(cat "$HOME/agsbx/port_so")
 inssocks5auth
 socks5_link="socks://$(printf '%s' "${socks5_auth}:${socks5_auth}" | base64 | tr -d '\n=')@${server_ip}:${port_so}#${sxname}Socks5-${hostname}"
 echo "$socks5_link" >> "$HOME/agsbx/jhsub.txt"
-printf '\033[1;33m%s\033[0m\n' "客户端IP: $server_ip"
-printf '\033[1;33m%s\033[0m\n' "端口号: $port_so"
-printf '\033[1;33m%s\033[0m\n' "用户名: $socks5_auth"
-printf '\033[1;33m%s\033[0m\n' "密码: $socks5_auth"
-echo "Tip: Socks5 is for client/app proxy settings. Do not import it as a normal node if your client does not support socks links."
-print_link "分享链接:" "$socks5_link"
+printf '\033[1;33m%s\033[0m\n' "客户端IP：$server_ip"
+printf '\033[1;33m%s\033[0m\n' "端口号：$port_so"
+printf '\033[1;33m%s\033[0m\n' "用户名：$socks5_auth"
+printf '\033[1;33m%s\033[0m\n' "密码：$socks5_auth"
+echo "温馨提示：socks5使用一般需要海外环境。"
+print_link "分享二维码：" "$socks5_link"
 fi
 argodomain=$(cat "$HOME/agsbx/sbargoym.log" 2>/dev/null)
 [ -z "$argodomain" ] && argodomain=$(grep -a trycloudflare.com "$HOME/agsbx/argo.log" 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
@@ -2173,10 +2173,10 @@ rules:
 EOF
 echo "---------------------------------------------------------"
 echo "$argoshow"
-[ -n "$vmatls_link1" ] && print_link "Argo TLS 443 share link:" "$vmatls_link1"
-[ -n "$vwatls_link1" ] && print_link "Argo TLS 443 share link:" "$vwatls_link1"
-[ -n "$vma_link7" ] && print_link "Argo 80 share link:" "$vma_link7"
-[ -n "$vwa_link2" ] && print_link "Argo 80 share link:" "$vwa_link2"
+[ -n "$vmatls_link1" ] && print_link "Argo TLS 443 分享二维码：" "$vmatls_link1"
+[ -n "$vwatls_link1" ] && print_link "Argo TLS 443 分享二维码：" "$vwatls_link1"
+[ -n "$vma_link7" ] && print_link "Argo 80 分享二维码：" "$vma_link7"
+[ -n "$vwa_link2" ] && print_link "Argo 80 分享二维码：" "$vwa_link2"
 echo
 if [ -s $HOME/agsbx/subport.log ]; then
 showsubport=$(cat $HOME/agsbx/subport.log)
