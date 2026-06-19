@@ -108,8 +108,63 @@ ip6tables -P FORWARD ACCEPT >/dev/null 2>&1
 ip6tables -P OUTPUT ACCEPT >/dev/null 2>&1
 fi
 }
+enable_network_tuning(){
+[ "$1" = "del" ] && return
+modprobe tcp_bbr >/dev/null 2>&1
+cat > /etc/sysctl.d/99-proxy-tuning.conf <<EOF
+fs.file-max = 1000000
+fs.inotify.max_user_instances = 65536
+net.ipv4.ip_forward = 1
+net.ipv4.conf.all.forwarding = 1
+net.ipv4.conf.default.forwarding = 1
+net.ipv6.conf.all.forwarding = 1
+net.ipv6.conf.default.forwarding = 1
+net.ipv6.conf.lo.forwarding = 1
+net.ipv6.conf.all.disable_ipv6 = 0
+net.ipv6.conf.default.disable_ipv6 = 0
+net.ipv6.conf.lo.disable_ipv6 = 0
+net.ipv4.ip_local_port_range = 2000 65535
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_retries1 = 3
+net.ipv4.tcp_retries2 = 5
+net.ipv4.tcp_orphan_retries = 3
+net.ipv4.tcp_syn_retries = 3
+net.ipv4.tcp_synack_retries = 3
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 10
+net.ipv4.tcp_max_tw_buckets = 10000
+net.ipv4.tcp_max_syn_backlog = 131072
+net.core.netdev_max_backlog = 131072
+net.core.somaxconn = 32768
+net.ipv4.tcp_keepalive_time = 300
+net.ipv4.tcp_keepalive_probes = 3
+net.ipv4.tcp_keepalive_intvl = 30
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_no_metrics_save = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_moderate_rcvbuf = 1
+net.core.rmem_max = 335544320
+net.core.wmem_max = 335544320
+net.ipv4.tcp_rmem = 8192 262144 536870912
+net.ipv4.tcp_wmem = 4096 16384 536870912
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
+net.ipv4.ping_group_range = 0 2147483647
+EOF
+sysctl --system >/dev/null 2>&1 || sysctl -p /etc/sysctl.d/99-proxy-tuning.conf >/dev/null 2>&1
+if sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | grep -qw bbr; then
+sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
+fi
+}
 setup_time_sync_job "$1"
 disable_system_firewall "$1"
+enable_network_tuning "$1"
 [ -z "${vlpt+x}" ] || vlp=yes
 [ -z "${vmpt+x}" ] || { vmp=yes; vmag=yes; }
 [ -z "${vwpt+x}" ] || { vwp=yes; vmag=yes; }
@@ -407,7 +462,7 @@ EOF
 insuuid
 if [ -n "$xhp" ] || [ -n "$vlp" ]; then
 if [ -z "$ym_vl_re" ]; then
-ym_vl_re=apple.com
+ym_vl_re=xp.apple.com
 fi
 echo "$ym_vl_re" > "$HOME/agsbx/ym_vl_re"
 echo "Reality域名：$ym_vl_re"
@@ -763,7 +818,7 @@ fi
 if [ -n "$arp" ]; then
 arp=arpt
 if [ -z "$ym_vl_re" ]; then
-ym_vl_re=apple.com
+ym_vl_re=xp.apple.com
 fi
 echo "$ym_vl_re" > "$HOME/agsbx/ym_vl_re"
 echo "Reality域名：$ym_vl_re"
@@ -2313,9 +2368,9 @@ fi
 fi
 echo
 echo "---------------------------------------------------------"
-echo "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
-echo "请向上翻看上方输出的节点分享链接和二维码。"
-echo "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
+printf '\033[1;31m%s\033[0m\n' "请向上翻看上方输出的节点分享链接和二维码。"
+printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
 echo "聚合节点文件：$HOME/agsbx/jhsub.txt"
 echo "查看节点命令：cat $HOME/agsbx/jhsub.txt"
 echo "========================================================="
@@ -2378,6 +2433,7 @@ fi
 if [ "$1" = "del" ]; then
 cleandel
 rm -rf sbx_update "$HOME/agsbx" "$HOME/websbx"
+rm -f /etc/sysctl.d/99-proxy-tuning.conf
 echo "卸载完成"
 echo "欢迎继续使用一键节点脚本生成" && sleep 2
 echo
