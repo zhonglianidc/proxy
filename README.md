@@ -43,7 +43,7 @@ vmpt="" vwpt="" sopt="" sspt="" bash <(curl -Ls https://raw.githubusercontent.co
 | Vless XHTTP ENC | `vxpt` | 留空随机端口，支持 CDN/回源配置 |
 | Vless WS ENC | `vwpt` | 留空随机端口，支持 Argo/CDN |
 | Vmess WS | `vmpt` | 留空随机端口，支持 Argo/CDN |
-| Shadowsocks 2022 | `sspt` | 留空随机端口 |
+| Shadowsocks | `sspt` | 留空随机端口 |
 | Socks5 | `sopt` | 留空随机端口，会输出分享链接和二维码 |
 | Hysteria2 | `hypt` | 留空随机端口 |
 | Tuic | `tupt` | 留空随机端口 |
@@ -62,17 +62,3 @@ proxy upx    # 更新 Xray 内核
 proxy ups    # 更新 Sing-box 内核
 proxy del    # 卸载
 ```
-
-## GitHub 部署注意事项
-
-1. 仓库建议保持公开，否则 VPS 无法直接通过 `raw.githubusercontent.com` 拉取脚本。
-2. 默认分支需要是 `main`；如果你改成其他分支，要同步改 `index.html` 和 README 里的 raw 地址。
-3. `proxy.sh` 第一行必须保持 `#!/bin/sh`，上传时不要用会破坏换行或编码的编辑器。
-4. Xray 会自动从 `XTLS/Xray-core` 官方 GitHub Release 下载最新版；Sing-box 会自动从 `SagerNet/sing-box` 官方 GitHub Release 下载最新版；Cloudflared 也使用官方最新版。
-5. VPS 需要能访问 GitHub Release 下载地址，否则内核下载会失败。
-6. 如果启用 CDN 优选相关功能，把 `YOUR_CDN_DOMAIN` 替换为你的优选域名后缀；不用 CDN 优选可忽略。
-7. 修改后可以打开 `index.html`，确认网页生成的命令已经指向 `zhonglianidc/proxy`。
-
-## Socks5 修改说明
-
-Socks5 用户名和密码会单独生成，同一个 12 位字母数字随机值；节点输出时会显示 Socks5 分享链接，并尝试在终端显示二维码，方便用户直接扫码。
