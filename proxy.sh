@@ -112,18 +112,20 @@ enable_network_tuning(){
 [ "$1" = "del" ] && return
 modprobe tcp_bbr >/dev/null 2>&1
 cat > /etc/sysctl.d/99-proxy-tuning.conf <<EOF
-fs.file-max = 1000000
-fs.inotify.max_user_instances = 65536
+fs.file-max = 2000000
+fs.inotify.max_user_instances = 8192
+fs.inotify.max_user_watches = 524288
 net.ipv4.ip_forward = 1
 net.ipv4.conf.all.forwarding = 1
 net.ipv4.conf.default.forwarding = 1
+net.ipv4.conf.all.route_localnet = 1
 net.ipv6.conf.all.forwarding = 1
 net.ipv6.conf.default.forwarding = 1
 net.ipv6.conf.lo.forwarding = 1
 net.ipv6.conf.all.disable_ipv6 = 0
 net.ipv6.conf.default.disable_ipv6 = 0
 net.ipv6.conf.lo.disable_ipv6 = 0
-net.ipv4.ip_local_port_range = 2000 65535
+net.ipv4.ip_local_port_range = 1024 65535
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 net.ipv4.tcp_timestamps = 1
@@ -135,26 +137,42 @@ net.ipv4.tcp_syn_retries = 3
 net.ipv4.tcp_synack_retries = 3
 net.ipv4.tcp_tw_reuse = 1
 net.ipv4.tcp_fin_timeout = 10
-net.ipv4.tcp_max_tw_buckets = 10000
-net.ipv4.tcp_max_syn_backlog = 131072
-net.core.netdev_max_backlog = 131072
-net.core.somaxconn = 32768
-net.ipv4.tcp_keepalive_time = 300
+net.ipv4.tcp_max_tw_buckets = 200000
+net.ipv4.tcp_max_syn_backlog = 262144
+net.core.netdev_max_backlog = 262144
+net.core.somaxconn = 65535
+net.ipv4.tcp_keepalive_time = 180
 net.ipv4.tcp_keepalive_probes = 3
-net.ipv4.tcp_keepalive_intvl = 30
+net.ipv4.tcp_keepalive_intvl = 20
 net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_autocorking = 0
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_no_metrics_save = 1
+net.ipv4.tcp_ecn = 0
+net.ipv4.tcp_frto = 0
+net.ipv4.tcp_mtu_probing = 1
 net.ipv4.tcp_sack = 1
 net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_adv_win_scale = -2
 net.ipv4.tcp_moderate_rcvbuf = 1
-net.core.rmem_max = 335544320
-net.core.wmem_max = 335544320
-net.ipv4.tcp_rmem = 8192 262144 536870912
-net.ipv4.tcp_wmem = 4096 16384 536870912
+net.core.rmem_default = 1048576
+net.core.wmem_default = 1048576
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.ipv4.tcp_rmem = 8192 262144 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.ipv4.tcp_mem = 65536 131072 262144
+net.ipv4.tcp_notsent_lowat = 131072
 net.ipv4.udp_rmem_min = 8192
 net.ipv4.udp_wmem_min = 8192
+net.ipv4.udp_mem = 65536 131072 262144
 net.ipv4.ping_group_range = 0 2147483647
+EOF
+cat > /etc/security/limits.d/99-proxy-limits.conf <<EOF
+* soft nofile 1000000
+* hard nofile 1000000
+root soft nofile 1000000
+root hard nofile 1000000
 EOF
 sysctl --system >/dev/null 2>&1 || sysctl -p /etc/sysctl.d/99-proxy-tuning.conf >/dev/null 2>&1
 if sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | grep -qw bbr; then
@@ -2434,6 +2452,7 @@ if [ "$1" = "del" ]; then
 cleandel
 rm -rf sbx_update "$HOME/agsbx" "$HOME/websbx"
 rm -f /etc/sysctl.d/99-proxy-tuning.conf
+rm -f /etc/security/limits.d/99-proxy-limits.conf
 echo "卸载完成"
 echo "欢迎继续使用一键节点脚本生成" && sleep 2
 echo
