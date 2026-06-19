@@ -263,8 +263,23 @@ fi
 if command -v qrencode >/dev/null 2>&1; then
 qrencode -t UTF8 "$qrtext"
 else
-echo "未检测到 qrencode，暂时无法在终端直接显示二维码"
+echo "qrencode is not installed, QR code cannot be shown in terminal."
 fi
+}
+print_section(){
+printf '\n\033[1;36m%s\033[0m\n' "============================================================"
+printf '\033[1;36m%s\033[0m\n' ">> $1"
+printf '\033[1;36m%s\033[0m\n' "============================================================"
+}
+print_link(){
+plink_title="$1"
+plink_url="$2"
+[ -z "$plink_url" ] && return
+printf '\033[1;33m%s\033[0m\n' "$plink_title"
+printf '\033[0;32m%s\033[0m\n' "$plink_url"
+printf '\033[1;33m%s\033[0m\n' "QR code:"
+showqrcode "$plink_url"
+echo
 }
 installxray(){
 echo
@@ -1315,52 +1330,46 @@ short_id_s=$(cat "$HOME/agsbx/sbk/short_id" 2>/dev/null)
 sskey=$(cat "$HOME/agsbx/sskey" 2>/dev/null)
 fi
 if grep xhttp-reality "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
-echo "💣【 Vless-xhttp-reality-enc 】支持ENC加密，节点信息如下："
+print_section "Vless XHTTP Reality ENC"
 port_xh=$(cat "$HOME/agsbx/port_xh")
 vl_xh_link="vless://$uuid@$server_ip:$port_xh?encryption=$enkey&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=xhttp&path=$uuid-xh&mode=auto#${sxname}vl-xhttp-reality-enc-$hostname"
 echo "$vl_xh_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$vl_xh_link"
-echo
+print_link "Share link:" "$vl_xh_link"
 fi
 if grep vless-xhttp "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
-echo "💣【 Vless-xhttp-enc 】支持ENC加密，节点信息如下："
+print_section "Vless XHTTP ENC"
 port_vx=$(cat "$HOME/agsbx/port_vx")
 vl_vx_link="vless://$uuid@$server_ip:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&path=$uuid-vx&mode=auto#${sxname}vl-xhttp-enc-$hostname"
 echo "$vl_vx_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$vl_vx_link"
-echo
+print_link "Share link:" "$vl_vx_link"
 if [ -f "$HOME/agsbx/cdnym" ]; then
-echo "💣【 Vless-xhttp-ecn-cdn 】支持ENC加密，节点信息如下："
-echo "注：默认地址 cdn数字.YOUR_CDN_DOMAIN 可自行更换优选IP域名，如是回源端口需手动修改443或者80系端口"
+print_section "Vless XHTTP ENC CDN"
+echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
 vl_vx_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&host=$xvvmcdnym&path=$uuid-vx&mode=auto#${sxname}vl-xhttp-enc-cdn-$hostname"
 echo "$vl_vx_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$vl_vx_cdn_link"
-echo
+print_link "Share link:" "$vl_vx_cdn_link"
 fi
 fi
 if grep vless-ws "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
-echo "💣【 Vless-ws-enc 】支持ENC加密，节点信息如下："
+print_section "Vless WS ENC"
 port_vw=$(cat "$HOME/agsbx/port_vw")
 vl_vw_link="vless://$uuid@$server_ip:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&path=$uuid-vw#${sxname}vl-ws-enc-$hostname"
 echo "$vl_vw_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$vl_vw_link"
-echo
+print_link "Share link:" "$vl_vw_link"
 if [ -f "$HOME/agsbx/cdnym" ]; then
-echo "💣【 Vless-ws-enc-cdn 】支持ENC加密，节点信息如下："
-echo "注：默认地址 cdn数字.YOUR_CDN_DOMAIN 可自行更换优选IP域名，如是回源端口需手动修改443或者80系端口"
+print_section "Vless WS ENC CDN"
+echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
 vl_vw_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$xvvmcdnym&path=$uuid-vw#${sxname}vl-ws-enc-cdn-$hostname"
 echo "$vl_vw_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$vl_vw_cdn_link"
-echo
+print_link "Share link:" "$vl_vw_cdn_link"
 fi
 fi
 if grep reality-vision "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
-echo "💣【 Vless-tcp-reality-vision 】节点信息如下："
+print_section "Vless TCP Reality Vision"
 port_vl_re=$(cat "$HOME/agsbx/port_vl_re")
 vl_link="vless://$uuid@$server_ip:$port_vl_re?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=tcp&headerType=none#${sxname}vl-reality-vision-$hostname"
 echo "$vl_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$vl_link"
-echo
+print_link "Share link:" "$vl_link"
 sbvlpt(){
 cat <<EOF
     {
@@ -1412,12 +1421,11 @@ echo "- ${sxname}vless-reality-vision-$hostname"
 }
 fi
 if grep ss-2022 "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
-echo "💣【 Shadowsocks-2022 】节点信息如下："
+print_section "Shadowsocks 2022"
 port_ss=$(cat "$HOME/agsbx/port_ss")
 ss_link="ss://$(echo -n "2022-blake3-aes-128-gcm:$sskey@$server_ip:$port_ss" | base64 -w0)#${sxname}Shadowsocks-2022-$hostname"
 echo "$ss_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$ss_link"
-echo
+print_link "Share link:" "$ss_link"
 sbsspt(){
 cat <<EOF
 {
@@ -1455,12 +1463,11 @@ echo "- ${sxname}Shadowsocks-2022-$hostname"
 }
 fi
 if grep vmess-xr "$HOME/agsbx/xr.json" >/dev/null 2>&1 || grep vmess-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
-echo "💣【 Vmess-ws 】节点信息如下："
+print_section "Vmess WS"
 port_vm_ws=$(cat "$HOME/agsbx/port_vm_ws")
 vm_link="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vm-ws-$hostname\", \"add\": \"$server_ip\", \"port\": \"$port_vm_ws\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"www.bing.com\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vm_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$vm_link"
-echo
+print_link "Share link:" "$vm_link"
 sbvmpt(){
 cat <<EOF
 {
@@ -1518,21 +1525,19 @@ clvmpt1(){
 echo "- ${sxname}vmess-ws-$hostname"
 }
 if [ -f "$HOME/agsbx/cdnym" ]; then
-echo "💣【 Vmess-ws-cdn 】节点信息如下："
-echo "注：默认地址 cdn数字.YOUR_CDN_DOMAIN 可自行更换优选IP域名，如是回源端口需手动修改443或者80系端口"
+print_section "Vmess WS CDN"
+echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
 vm_cdn_link="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vm-ws-cdn-$hostname\", \"add\": \"cdn$(cfipsj).YOUR_CDN_DOMAIN\", \"port\": \"$port_vm_ws\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$xvvmcdnym\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vm_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$vm_cdn_link"
-echo
+print_link "Share link:" "$vm_cdn_link"
 fi
 fi
 if grep anytls-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
-echo "💣【 AnyTLS 】节点信息如下："
+print_section "AnyTLS"
 port_an=$(cat "$HOME/agsbx/port_an")
 an_link="anytls://$uuid@$server_ip:$port_an?insecure=1&allowInsecure=1#${sxname}anytls-$hostname"
 echo "$an_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$an_link"
-echo
+print_link "Share link:" "$an_link"
 sbanpt(){
 cat <<EOF
          {
@@ -1575,12 +1580,11 @@ echo "- ${sxname}anytls-$hostname"
 }
 fi
 if grep anyreality-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
-echo "💣【 Any-Reality 】节点信息如下："
+print_section "AnyTLS Reality"
 port_ar=$(cat "$HOME/agsbx/port_ar")
 ar_link="anytls://$uuid@$server_ip:$port_ar?security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_s&sid=$short_id_s&type=tcp&headerType=none#${sxname}any-reality-$hostname"
 echo "$ar_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$ar_link"
-echo
+print_link "Share link:" "$ar_link"
 sbarpt(){
 cat <<EOF
     {
@@ -1613,7 +1617,7 @@ echo "\"${sxname}any-reality-$hostname\","
 }
 fi
 if grep hy2-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
-echo "💣【 Hysteria2 】节点信息如下："
+print_section "Hysteria2"
 SHA256=$(cat "$HOME/agsbx/SHA256.txt")
 port_hy2=$(cat "$HOME/agsbx/port_hy2")
 hy2_ports=$(iptables -t nat -nL --line 2>/dev/null | grep -w "$port_hy2" | awk '{print $8}' | sed 's/dpts://; s/dpt://' | tr '\n' ',' | sed 's/,$//')
@@ -1633,8 +1637,7 @@ fi
 #hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1&allowInsecure=1$hyps&sni=www.bing.com#${sxname}hy2-$hostname"
 hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=0&allowInsecure=0$hyps&sni=www.bing.com&pinSHA256=$SHA256#${sxname}hy2-$hostname"
 echo "$hy2_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$hy2_link"
-echo
+print_link "Share link:" "$hy2_link"
 sbhypt(){
 cat <<EOF
     {
@@ -1678,12 +1681,11 @@ echo "- ${sxname}hysteria2-$hostname"
 }
 fi
 if grep tuic5-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
-echo "💣【 Tuic 】节点信息如下："
+print_section "Tuic"
 port_tu=$(cat "$HOME/agsbx/port_tu")
 tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&insecure=1&allowInsecure=1&allow_insecure=1#${sxname}tuic-$hostname"
 echo "$tuic5_link" >> "$HOME/agsbx/jhsub.txt"
-echo "$tuic5_link"
-echo
+print_link "Share link:" "$tuic5_link"
 sbtupt(){
 cat <<EOF
         {
@@ -1734,19 +1736,17 @@ echo "- ${sxname}tuic5-$hostname"
 }
 fi
 if grep socks5-xr "$HOME/agsbx/xr.json" >/dev/null 2>&1 || grep socks5-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
-echo "💣【 Socks5 】客户端信息如下："
+print_section "Socks5"
 port_so=$(cat "$HOME/agsbx/port_so")
 inssocks5auth
 socks5_link="socks://$(printf '%s' "${socks5_auth}:${socks5_auth}" | base64 | tr -d '\n=')@${server_ip}:${port_so}#${sxname}Socks5-${hostname}"
-echo "请配合其他应用内置代理使用，勿做节点直接使用"
-echo "客户端地址：$server_ip"
-echo "客户端端口：$port_so"
-echo "客户端用户名：$socks5_auth"
-echo "客户端密码：$socks5_auth"
-echo "Socks5分享链接：$socks5_link"
-echo "Socks5二维码："
-showqrcode "$socks5_link"
-echo
+echo "$socks5_link" >> "$HOME/agsbx/jhsub.txt"
+printf '\033[1;33m%s\033[0m\n' "Client address: $server_ip"
+printf '\033[1;33m%s\033[0m\n' "Client port: $port_so"
+printf '\033[1;33m%s\033[0m\n' "Username: $socks5_auth"
+printf '\033[1;33m%s\033[0m\n' "Password: $socks5_auth"
+echo "Tip: Socks5 is for client/app proxy settings. Do not import it as a normal node if your client does not support socks links."
+print_link "Share link:" "$socks5_link"
 fi
 argodomain=$(cat "$HOME/agsbx/sbargoym.log" 2>/dev/null)
 [ -z "$argodomain" ] && argodomain=$(grep -a trycloudflare.com "$HOME/agsbx/argo.log" 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
@@ -2164,6 +2164,10 @@ rules:
 EOF
 echo "---------------------------------------------------------"
 echo "$argoshow"
+[ -n "$vmatls_link1" ] && print_link "Argo TLS 443 share link:" "$vmatls_link1"
+[ -n "$vwatls_link1" ] && print_link "Argo TLS 443 share link:" "$vwatls_link1"
+[ -n "$vma_link7" ] && print_link "Argo 80 share link:" "$vma_link7"
+[ -n "$vwa_link2" ] && print_link "Argo 80 share link:" "$vwa_link2"
 echo
 if [ -s $HOME/agsbx/subport.log ]; then
 showsubport=$(cat $HOME/agsbx/subport.log)
@@ -2404,4 +2408,3 @@ echo "相关快捷方式如下："
 showmode
 exit
 fi
-
