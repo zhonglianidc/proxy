@@ -1,5 +1,11 @@
 #!/bin/sh
-export LANG=en_US.UTF-8
+if locale -a 2>/dev/null | grep -qi '^C\.UTF-8$'; then
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+else
+export LANG=C
+unset LC_ALL
+fi
 [ -z "${vlpt+x}" ] || vlp=yes
 [ -z "${vmpt+x}" ] || { vmp=yes; vmag=yes; }
 [ -z "${vwpt+x}" ] || { vwp=yes; vmag=yes; }
@@ -166,9 +172,12 @@ out="$2"
 github_latest_tag(){
 repo="$1"
 api="https://api.github.com/repos/${repo}/releases/latest"
-json="$HOME/agsbx/latest-$(echo "$repo" | tr '/' '-').json"
-download_file "$api" "$json" >/dev/null 2>&1
-tag=$(grep -m 1 '"tag_name":' "$json" | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
+tag=""
+if command -v curl >/dev/null 2>&1; then
+tag=$(curl -fsSL "$api" 2>/dev/null | tr -d '\r\n' | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+elif command -v wget >/dev/null 2>&1; then
+tag=$(wget -qO- "$api" 2>/dev/null | tr -d '\r\n' | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+fi
 if [ -z "$tag" ] && command -v curl >/dev/null 2>&1; then
 tag=$(curl -Ls -o /dev/null -w '%{url_effective}' "https://github.com/${repo}/releases/latest" | awk -F/ '{print $NF}')
 fi
@@ -178,23 +187,23 @@ upxray(){
 case "$cpu" in
 amd64) xray_file='Xray-linux-64.zip' ;;
 arm64) xray_file='Xray-linux-arm64-v8a.zip' ;;
-*) echo "Xray暂不支持$(uname -m)架构" && exit 1 ;;
+*) echo "Xray does not support $(uname -m) architecture yet" && exit 1 ;;
 esac
 xray_tag=$(github_latest_tag "XTLS/Xray-core")
-[ -z "$xray_tag" ] && echo "未找到Xray官方最新版本号" && exit 1
+case "$xray_tag" in v*) ;; *) echo "Failed to get latest Xray release tag"; exit 1 ;; esac
 url="https://github.com/XTLS/Xray-core/releases/download/${xray_tag}/${xray_file}"
 tmpdir="$HOME/agsbx/xray_tmp"
 rm -rf "$tmpdir" && mkdir -p "$tmpdir"
 archive="$tmpdir/xray.zip"
-echo "下载Xray官方最新版内核：$url"
-download_file "$url" "$archive" || { echo "Xray下载失败"; exit 1; }
-unzip -o -q "$archive" -d "$tmpdir" || { echo "Xray解压失败"; exit 1; }
-[ -f "$tmpdir/xray" ] || { echo "Xray压缩包内未找到xray文件"; exit 1; }
+echo "Downloading latest official Xray core: $url"
+download_file "$url" "$archive" || { echo "Xray download failed"; exit 1; }
+unzip -o -q "$archive" -d "$tmpdir" || { echo "Xray unzip failed"; exit 1; }
+[ -f "$tmpdir/xray" ] || { echo "Xray binary was not found in archive"; exit 1; }
 mv -f "$tmpdir/xray" "$HOME/agsbx/xray"
 chmod +x "$HOME/agsbx/xray"
 rm -rf "$tmpdir"
 sbcore=$("$HOME/agsbx/xray" version 2>/dev/null | awk '/^Xray/{print $2}')
-echo "已安装Xray官方最新版内核：$sbcore"
+echo "Installed latest official Xray core: $sbcore"
 }
 upsingbox(){
 case "$cpu" in
@@ -205,25 +214,25 @@ else
 singbox_suffix="linux-${cpu}"
 fi
 ;;
-*) echo "Sing-box暂不支持$(uname -m)架构" && exit 1 ;;
+*) echo "Sing-box does not support $(uname -m) architecture yet" && exit 1 ;;
 esac
 singbox_tag=$(github_latest_tag "SagerNet/sing-box")
-[ -z "$singbox_tag" ] && echo "未找到Sing-box官方最新版本号" && exit 1
+case "$singbox_tag" in v*) ;; *) echo "Failed to get latest Sing-box release tag"; exit 1 ;; esac
 singbox_version=${singbox_tag#v}
 url="https://github.com/SagerNet/sing-box/releases/download/${singbox_tag}/sing-box-${singbox_version}-${singbox_suffix}.tar.gz"
 tmpdir="$HOME/agsbx/singbox_tmp"
 rm -rf "$tmpdir" && mkdir -p "$tmpdir"
 archive="$tmpdir/sing-box.tar.gz"
-echo "下载Sing-box官方最新版内核：$url"
-download_file "$url" "$archive" || { echo "Sing-box下载失败"; exit 1; }
-tar -xzf "$archive" -C "$tmpdir" || { echo "Sing-box解压失败"; exit 1; }
+echo "Downloading latest official Sing-box core: $url"
+download_file "$url" "$archive" || { echo "Sing-box download failed"; exit 1; }
+tar -xzf "$archive" -C "$tmpdir" || { echo "Sing-box extract failed"; exit 1; }
 bin=$(find "$tmpdir" -type f -name sing-box | head -n 1)
-[ -n "$bin" ] || { echo "Sing-box压缩包内未找到sing-box文件"; exit 1; }
+[ -n "$bin" ] || { echo "Sing-box binary was not found in archive"; exit 1; }
 mv -f "$bin" "$HOME/agsbx/sing-box"
 chmod +x "$HOME/agsbx/sing-box"
 rm -rf "$tmpdir"
 sbcore=$("$HOME/agsbx/sing-box" version 2>/dev/null | awk '/version/{print $NF}')
-echo "已安装Sing-box官方最新版内核：$sbcore"
+echo "Installed latest official Sing-box core: $sbcore"
 }
 insuuid(){
 if [ -z "$uuid" ] && [ ! -e "$HOME/agsbx/uuid" ]; then
