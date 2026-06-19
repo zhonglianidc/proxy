@@ -821,7 +821,7 @@ fi
 if [ -n "$ssp" ]; then
 ssp=sspt
 if [ ! -e "$HOME/agsbx/sskey" ]; then
-sskey=$("$HOME/agsbx/sing-box" generate rand 16 --base64)
+sskey=$(tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 16)
 echo "$sskey" > "$HOME/agsbx/sskey"
 fi
 if [ -z "$port_ss" ] && [ ! -e "$HOME/agsbx/port_ss" ]; then
@@ -832,14 +832,14 @@ echo "$port_ss" > "$HOME/agsbx/port_ss"
 fi
 sskey=$(cat "$HOME/agsbx/sskey")
 port_ss=$(cat "$HOME/agsbx/port_ss")
-echo "Shadowsocks-2022端口：$port_ss"
+echo "Shadowsocks端口：$port_ss"
 cat >> "$HOME/agsbx/sb.json" <<EOF
         {
             "type": "shadowsocks",
-            "tag":"ss-2022",
+            "tag":"ss",
             "listen": "::",
             "listen_port": $port_ss,
-            "method": "2022-blake3-aes-128-gcm",
+            "method": "aes-256-gcm",
             "password": "$sskey"
     },  
 EOF
@@ -1523,7 +1523,7 @@ cat <<EOF
 EOF
 }
 sbvlpt1(){
-echo ""$hostname","
+echo "\"$hostname\","
 }
 clvlpt(){
 cat <<EOF
@@ -1547,10 +1547,10 @@ clvlpt1(){
 echo "- $hostname"
 }
 fi
-if grep ss-2022 "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
-print_section "Shadowsocks 2022"
+if grep '"tag":"ss"' "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
+print_section "Shadowsocks"
 port_ss=$(cat "$HOME/agsbx/port_ss")
-ss_userinfo=$(printf '%s' "2022-blake3-aes-128-gcm:$sskey" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')
+ss_userinfo=$(printf '%s' "aes-256-gcm:$sskey" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')
 ss_link="ss://${ss_userinfo}@${server_ip}:${port_ss}#$hostname"
 echo "$ss_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$ss_link"
@@ -1561,7 +1561,7 @@ cat <<EOF
        "tag": "$hostname",
        "server": "$server_ip",
        "server_port": $port_ss,
-       "method": "2022-blake3-aes-128-gcm",
+       "method": "aes-256-gcm",
        "password": "$sskey",
        "udp_over_tcp": {
         "enabled": true,
@@ -1571,7 +1571,7 @@ cat <<EOF
 EOF
 }
 sbsspt1(){
-echo ""$hostname","
+echo "\"$hostname\","
 }
 clsspt(){
 cat <<EOF
@@ -1579,7 +1579,7 @@ cat <<EOF
   type: ss
   server: $server_ip
   port: $port_ss
-  cipher: 2022-blake3-aes-128-gcm
+  cipher: aes-256-gcm
   password: "$sskey"
   udp: true
   udp-over-tcp: true
@@ -1628,7 +1628,7 @@ cat <<EOF
 EOF
 }
 sbvmpt1(){
-echo ""$hostname","
+echo "\"$hostname\","
 }
 clvmpt(){
 cat <<EOF
@@ -1686,7 +1686,7 @@ cat <<EOF
 EOF
 }
 sbanpt1(){
-echo ""$hostname","
+echo "\"$hostname\","
 }
 clanpt(){
 cat <<EOF
@@ -1741,7 +1741,7 @@ cat <<EOF
 EOF
 }
 sbarpt1(){
-echo ""$hostname","
+echo "\"$hostname\","
 }
 fi
 if grep hy2-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
@@ -1787,7 +1787,7 @@ $(sbhy2ports 2>/dev/null)
 EOF
 }
 sbhypt1(){
-echo ""$hostname","
+echo "\"$hostname\","
 }
 clhypt(){
 cat <<EOF
@@ -1840,7 +1840,7 @@ cat <<EOF
 EOF
 }
 sbtupt1(){
-echo ""$hostname","
+echo "\"$hostname\","
 }
 cltupt(){
 cat <<EOF
@@ -1966,8 +1966,8 @@ cat <<EOF
 EOF
 }
 sbvmargopt1(){
-echo ""$hostname","
-echo ""$hostname","
+echo "\"$hostname\","
+echo "\"$hostname\","
 }
 clvmargopt(){
 cat <<EOF
