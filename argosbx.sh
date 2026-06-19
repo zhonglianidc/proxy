@@ -1750,12 +1750,12 @@ port_so=$(cat "$HOME/agsbx/port_so")
 inssocks5auth
 socks5_link="socks://$(printf '%s' "${socks5_auth}:${socks5_auth}" | base64 | tr -d '\n=')@${server_ip}:${port_so}#${sxname}Socks5-${hostname}"
 echo "$socks5_link" >> "$HOME/agsbx/jhsub.txt"
-printf '\033[1;33m%s\033[0m\n' "Client address: $server_ip"
-printf '\033[1;33m%s\033[0m\n' "Client port: $port_so"
-printf '\033[1;33m%s\033[0m\n' "Username: $socks5_auth"
-printf '\033[1;33m%s\033[0m\n' "Password: $socks5_auth"
+printf '\033[1;33m%s\033[0m\n' "客户端IP: $server_ip"
+printf '\033[1;33m%s\033[0m\n' "端口号: $port_so"
+printf '\033[1;33m%s\033[0m\n' "用户名: $socks5_auth"
+printf '\033[1;33m%s\033[0m\n' "密码: $socks5_auth"
 echo "Tip: Socks5 is for client/app proxy settings. Do not import it as a normal node if your client does not support socks links."
-print_link "Share link:" "$socks5_link"
+print_link "分享链接:" "$socks5_link"
 fi
 argodomain=$(cat "$HOME/agsbx/sbargoym.log" 2>/dev/null)
 [ -z "$argodomain" ] && argodomain=$(grep -a trycloudflare.com "$HOME/agsbx/argo.log" 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
