@@ -1873,6 +1873,7 @@ printf '\033[1;33m%s\033[0m\n' "客户端IP：$server_ip"
 printf '\033[1;33m%s\033[0m\n' "端口号：$port_so"
 printf '\033[1;33m%s\033[0m\n' "用户名：$socks5_auth"
 printf '\033[1;33m%s\033[0m\n' "密码：$socks5_auth"
+printf '\033[1;33m%s\033[0m\n' "指纹浏览器格式：${server_ip}:${port_so}:${socks5_auth}:${socks5_auth}"
 echo "温馨提示：socks5使用一般需要海外环境。"
 print_link "节点分享链接：" "$socks5_link"
 fi
