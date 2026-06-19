@@ -1482,7 +1482,8 @@ fi
 if grep ss-2022 "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "Shadowsocks 2022"
 port_ss=$(cat "$HOME/agsbx/port_ss")
-ss_link="ss://$(echo -n "2022-blake3-aes-128-gcm:$sskey@$server_ip:$port_ss" | base64 -w0)#$hostname"
+ss_userinfo=$(printf '%s' "2022-blake3-aes-128-gcm:$sskey" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')
+ss_link="ss://${ss_userinfo}@${server_ip}:${port_ss}#$hostname"
 echo "$ss_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$ss_link"
 sbsspt(){
