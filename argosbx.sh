@@ -303,7 +303,7 @@ dnf install -y qrencode >/dev/null 2>&1
 fi
 fi
 if command -v qrencode >/dev/null 2>&1; then
-qrencode -t UTF8 -m 0 -l L "$qrtext" 2>/dev/null || qrencode -t ANSIUTF8 -m 0 -l L "$qrtext" 2>/dev/null || qrencode -t UTF8 -m 0 "$qrtext"
+qrencode -t UTF8 -m 0 -l L -v 10 "$qrtext" 2>/dev/null || qrencode -t UTF8 -m 0 -l L "$qrtext" 2>/dev/null || qrencode -t ANSIUTF8 -m 0 -l L "$qrtext" 2>/dev/null || qrencode -t UTF8 -m 0 "$qrtext"
 else
 echo "qrencode is not installed, QR code cannot be shown in terminal."
 fi
@@ -1295,6 +1295,22 @@ server_ip="$serip"
 echo "$server_ip" > "$HOME/agsbx/server_ip.log"
 fi
 }
+set_node_hostname(){
+node_ip="$server_ip"
+node_ip=${node_ip#\[}
+node_ip=${node_ip%\]}
+node_country=""
+if command -v curl >/dev/null 2>&1; then
+node_country=$(curl -s --max-time 5 "http://ip-api.com/json/${node_ip}?fields=country&lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+elif command -v wget >/dev/null 2>&1; then
+node_country=$(timeout 5 wget -qO- "http://ip-api.com/json/${node_ip}?fields=country&lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+fi
+[ -z "$node_country" ] && node_country=$(printf '%s' "$location" | awk '{print $1}')
+[ -z "$node_country" ] && node_country="未知"
+node_country=$(printf '%s' "$node_country" | sed 's/[[:space:]]//g')
+hostname="${node_country}-${node_ip}"
+echo "$hostname" > "$HOME/agsbx/node_name"
+}
 ipchange(){
 v4v6
 if [ -z "$v4" ]; then
@@ -1347,6 +1363,7 @@ ipchange
 rm -rf "$HOME/agsbx/jhsub.txt"
 uuid=$(cat "$HOME/agsbx/uuid")
 server_ip=$(cat "$HOME/agsbx/server_ip.log")
+set_node_hostname
 sxname=$(cat "$HOME/agsbx/name" 2>/dev/null)
 xvvmcdnym=$(cat "$HOME/agsbx/cdnym" 2>/dev/null)
 echo "*********************************************************"
@@ -1374,49 +1391,49 @@ fi
 if grep xhttp-reality "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
 print_section "Vless XHTTP Reality ENC"
 port_xh=$(cat "$HOME/agsbx/port_xh")
-vl_xh_link="vless://$uuid@$server_ip:$port_xh?encryption=$enkey&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=xhttp&path=$uuid-xh&mode=auto#${sxname}vl-xhttp-reality-enc-$hostname"
+vl_xh_link="vless://$uuid@$server_ip:$port_xh?encryption=$enkey&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=xhttp&path=$uuid-xh&mode=auto#$hostname"
 echo "$vl_xh_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$vl_xh_link"
+print_link "节点分享链接：" "$vl_xh_link"
 fi
 if grep vless-xhttp "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
 print_section "Vless XHTTP ENC"
 port_vx=$(cat "$HOME/agsbx/port_vx")
-vl_vx_link="vless://$uuid@$server_ip:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&path=$uuid-vx&mode=auto#${sxname}vl-xhttp-enc-$hostname"
+vl_vx_link="vless://$uuid@$server_ip:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&path=$uuid-vx&mode=auto#$hostname"
 echo "$vl_vx_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$vl_vx_link"
+print_link "节点分享链接：" "$vl_vx_link"
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vless XHTTP ENC CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
-vl_vx_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&host=$xvvmcdnym&path=$uuid-vx&mode=auto#${sxname}vl-xhttp-enc-cdn-$hostname"
+vl_vx_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&host=$xvvmcdnym&path=$uuid-vx&mode=auto#$hostname"
 echo "$vl_vx_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$vl_vx_cdn_link"
+print_link "节点分享链接：" "$vl_vx_cdn_link"
 fi
 fi
 if grep vless-ws "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
 print_section "Vless WS ENC"
 port_vw=$(cat "$HOME/agsbx/port_vw")
-vl_vw_link="vless://$uuid@$server_ip:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&path=$uuid-vw#${sxname}vl-ws-enc-$hostname"
+vl_vw_link="vless://$uuid@$server_ip:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&path=$uuid-vw#$hostname"
 echo "$vl_vw_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$vl_vw_link"
+print_link "节点分享链接：" "$vl_vw_link"
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vless WS ENC CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
-vl_vw_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$xvvmcdnym&path=$uuid-vw#${sxname}vl-ws-enc-cdn-$hostname"
+vl_vw_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$xvvmcdnym&path=$uuid-vw#$hostname"
 echo "$vl_vw_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$vl_vw_cdn_link"
+print_link "节点分享链接：" "$vl_vw_cdn_link"
 fi
 fi
 if grep reality-vision "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
 print_section "Vless TCP Reality Vision"
 port_vl_re=$(cat "$HOME/agsbx/port_vl_re")
-vl_link="vless://$uuid@$server_ip:$port_vl_re?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=tcp&headerType=none#${sxname}vl-reality-vision-$hostname"
+vl_link="vless://$uuid@$server_ip:$port_vl_re?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=tcp&headerType=none#$hostname"
 echo "$vl_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$vl_link"
+print_link "节点分享链接：" "$vl_link"
 sbvlpt(){
 cat <<EOF
     {
       "type": "vless",
-      "tag": "${sxname}vless-$hostname",
+      "tag": "$hostname",
       "server": "$server_ip",
       "server_port": $port_vl_re,
       "uuid": "$uuid",
@@ -1438,11 +1455,11 @@ cat <<EOF
 EOF
 }
 sbvlpt1(){
-echo "\"${sxname}vless-$hostname\","
+echo "\"$hostname\","
 }
 clvlpt(){
 cat <<EOF
-- name: ${sxname}vless-reality-vision-$hostname               
+- name: $hostname               
   type: vless
   server: $server_ip                          
   port: $port_vl_re                                
@@ -1459,20 +1476,20 @@ cat <<EOF
 EOF
 }
 clvlpt1(){
-echo "- ${sxname}vless-reality-vision-$hostname"
+echo "- $hostname"
 }
 fi
 if grep ss-2022 "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "Shadowsocks 2022"
 port_ss=$(cat "$HOME/agsbx/port_ss")
-ss_link="ss://$(echo -n "2022-blake3-aes-128-gcm:$sskey@$server_ip:$port_ss" | base64 -w0)#${sxname}Shadowsocks-2022-$hostname"
+ss_link="ss://$(echo -n "2022-blake3-aes-128-gcm:$sskey@$server_ip:$port_ss" | base64 -w0)#$hostname"
 echo "$ss_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$ss_link"
+print_link "节点分享链接：" "$ss_link"
 sbsspt(){
 cat <<EOF
 {
        "type": "shadowsocks",
-       "tag": "${sxname}Shadowsocks-2022-$hostname",
+       "tag": "$hostname",
        "server": "$server_ip",
        "server_port": $port_ss,
        "method": "2022-blake3-aes-128-gcm",
@@ -1485,11 +1502,11 @@ cat <<EOF
 EOF
 }
 sbsspt1(){
-echo "\"${sxname}Shadowsocks-2022-$hostname\","
+echo "\"$hostname\","
 }
 clsspt(){
 cat <<EOF
-- name: "${sxname}Shadowsocks-2022-$hostname"
+- name: "$hostname"
   type: ss
   server: $server_ip
   port: $port_ss
@@ -1501,21 +1518,21 @@ cat <<EOF
 EOF
 }
 clsspt1(){
-echo "- ${sxname}Shadowsocks-2022-$hostname"
+echo "- $hostname"
 }
 fi
 if grep vmess-xr "$HOME/agsbx/xr.json" >/dev/null 2>&1 || grep vmess-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "Vmess WS"
 port_vm_ws=$(cat "$HOME/agsbx/port_vm_ws")
-vm_link="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vm-ws-$hostname\", \"add\": \"$server_ip\", \"port\": \"$port_vm_ws\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"www.bing.com\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
+vm_link="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"$server_ip\", \"port\": \"$port_vm_ws\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"www.bing.com\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vm_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$vm_link"
+print_link "节点分享链接：" "$vm_link"
 sbvmpt(){
 cat <<EOF
 {
             "server": "$server_ip",
             "server_port": $port_vm_ws,
-            "tag": "${sxname}vmess-$hostname",
+            "tag": "$hostname",
             "tls": {
                 "enabled": false,
                 "server_name": "www.bing.com",
@@ -1542,11 +1559,11 @@ cat <<EOF
 EOF
 }
 sbvmpt1(){
-echo "\"${sxname}vmess-$hostname\","
+echo "\"$hostname\","
 }
 clvmpt(){
 cat <<EOF
-- name: ${sxname}vmess-ws-$hostname                         
+- name: $hostname                         
   type: vmess
   server: $server_ip                        
   port: $port_vm_ws                                     
@@ -1564,27 +1581,27 @@ cat <<EOF
 EOF
 }
 clvmpt1(){
-echo "- ${sxname}vmess-ws-$hostname"
+echo "- $hostname"
 }
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vmess WS CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
-vm_cdn_link="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vm-ws-cdn-$hostname\", \"add\": \"cdn$(cfipsj).YOUR_CDN_DOMAIN\", \"port\": \"$port_vm_ws\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$xvvmcdnym\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
+vm_cdn_link="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn$(cfipsj).YOUR_CDN_DOMAIN\", \"port\": \"$port_vm_ws\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$xvvmcdnym\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vm_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$vm_cdn_link"
+print_link "节点分享链接：" "$vm_cdn_link"
 fi
 fi
 if grep anytls-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "AnyTLS"
 port_an=$(cat "$HOME/agsbx/port_an")
-an_link="anytls://$uuid@$server_ip:$port_an?insecure=1&allowInsecure=1#${sxname}anytls-$hostname"
+an_link="anytls://$uuid@$server_ip:$port_an?insecure=1&allowInsecure=1#$hostname"
 echo "$an_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$an_link"
+print_link "节点分享链接：" "$an_link"
 sbanpt(){
 cat <<EOF
          {
             "type": "anytls",
-            "tag": "${sxname}anytls-$hostname",
+            "tag": "$hostname",
             "server": "$server_ip",
             "server_port": $port_an,
             "password": "$uuid",
@@ -1600,11 +1617,11 @@ cat <<EOF
 EOF
 }
 sbanpt1(){
-echo "\"${sxname}anytls-$hostname\","
+echo "\"$hostname\","
 }
 clanpt(){
 cat <<EOF
-- name: ${sxname}anytls-$hostname
+- name: $hostname
   type: anytls
   server: $server_ip
   port: $port_an
@@ -1618,20 +1635,20 @@ cat <<EOF
 EOF
 }
 clanpt1(){
-echo "- ${sxname}anytls-$hostname"
+echo "- $hostname"
 }
 fi
 if grep anyreality-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "AnyTLS Reality"
 port_ar=$(cat "$HOME/agsbx/port_ar")
-ar_link="anytls://$uuid@$server_ip:$port_ar?security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_s&sid=$short_id_s&type=tcp&headerType=none#${sxname}any-reality-$hostname"
+ar_link="anytls://$uuid@$server_ip:$port_ar?security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_s&sid=$short_id_s&type=tcp&headerType=none#$hostname"
 echo "$ar_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$ar_link"
+print_link "节点分享链接：" "$ar_link"
 sbarpt(){
 cat <<EOF
     {
         "type": "anytls",
-        "tag": "${sxname}any-reality-$hostname",
+        "tag": "$hostname",
         "server": "$server_ip",
         "server_port": $port_ar,
         "password": "$uuid",
@@ -1655,7 +1672,7 @@ cat <<EOF
 EOF
 }
 sbarpt1(){
-echo "\"${sxname}any-reality-$hostname\","
+echo "\"$hostname\","
 }
 fi
 if grep hy2-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
@@ -1676,15 +1693,15 @@ EOF
 else
 hyps=
 fi
-#hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1&allowInsecure=1$hyps&sni=www.bing.com#${sxname}hy2-$hostname"
-hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=0&allowInsecure=0$hyps&sni=www.bing.com&pinSHA256=$SHA256#${sxname}hy2-$hostname"
+#hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1&allowInsecure=1$hyps&sni=www.bing.com#$hostname"
+hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=0&allowInsecure=0$hyps&sni=www.bing.com&pinSHA256=$SHA256#$hostname"
 echo "$hy2_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$hy2_link"
+print_link "节点分享链接：" "$hy2_link"
 sbhypt(){
 cat <<EOF
     {
         "type": "hysteria2",
-        "tag": "${sxname}hy2-$hostname",
+        "tag": "$hostname",
         "server": "$server_ip",
         "server_port": $port_hy2,
 $(sbhy2ports 2>/dev/null)
@@ -1701,11 +1718,11 @@ $(sbhy2ports 2>/dev/null)
 EOF
 }
 sbhypt1(){
-echo "\"${sxname}hy2-$hostname\","
+echo "\"$hostname\","
 }
 clhypt(){
 cat <<EOF
-- name: ${sxname}hysteria2-$hostname                            
+- name: $hostname                            
   type: hysteria2                                      
   server: $server_ip                              
   port: $port_hy2
@@ -1719,20 +1736,20 @@ cat <<EOF
 EOF
 }
 clhypt1(){
-echo "- ${sxname}hysteria2-$hostname"
+echo "- $hostname"
 }
 fi
 if grep tuic5-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "Tuic"
 port_tu=$(cat "$HOME/agsbx/port_tu")
-tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&insecure=1&allowInsecure=1&allow_insecure=1#${sxname}tuic-$hostname"
+tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&insecure=1&allowInsecure=1&allow_insecure=1#$hostname"
 echo "$tuic5_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "分享二维码：" "$tuic5_link"
+print_link "节点分享链接：" "$tuic5_link"
 sbtupt(){
 cat <<EOF
         {
             "type":"tuic",
-            "tag": "${sxname}tuic5-$hostname",
+            "tag": "$hostname",
             "server": "$server_ip",
             "server_port": $port_tu,
             "uuid": "$uuid",
@@ -1754,11 +1771,11 @@ cat <<EOF
 EOF
 }
 sbtupt1(){
-echo "\"${sxname}tuic5-$hostname\","
+echo "\"$hostname\","
 }
 cltupt(){
 cat <<EOF
-- name: ${sxname}tuic5-$hostname                            
+- name: $hostname                            
   server: $server_ip                      
   port: $port_tu                                    
   type: tuic
@@ -1774,59 +1791,59 @@ cat <<EOF
 EOF
 }
 cltupt1(){
-echo "- ${sxname}tuic5-$hostname"
+echo "- $hostname"
 }
 fi
 if grep socks5-xr "$HOME/agsbx/xr.json" >/dev/null 2>&1 || grep socks5-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "Socks5"
 port_so=$(cat "$HOME/agsbx/port_so")
 inssocks5auth
-socks5_link="socks://$(printf '%s' "${socks5_auth}:${socks5_auth}" | base64 | tr -d '\n=')@${server_ip}:${port_so}#${sxname}Socks5-${hostname}"
+socks5_link="socks://$(printf '%s' "${socks5_auth}:${socks5_auth}" | base64 | tr -d '\n=')@${server_ip}:${port_so}#$hostname"
 echo "$socks5_link" >> "$HOME/agsbx/jhsub.txt"
 printf '\033[1;33m%s\033[0m\n' "客户端IP：$server_ip"
 printf '\033[1;33m%s\033[0m\n' "端口号：$port_so"
 printf '\033[1;33m%s\033[0m\n' "用户名：$socks5_auth"
 printf '\033[1;33m%s\033[0m\n' "密码：$socks5_auth"
 echo "温馨提示：socks5使用一般需要海外环境。"
-print_link "分享二维码：" "$socks5_link"
+print_link "节点分享链接：" "$socks5_link"
 fi
 argodomain=$(cat "$HOME/agsbx/sbargoym.log" 2>/dev/null)
 [ -z "$argodomain" ] && argodomain=$(grep -a trycloudflare.com "$HOME/agsbx/argo.log" 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
 if [ -n "$argodomain" ]; then
 vlvm=$(cat $HOME/agsbx/vlvm 2>/dev/null)
 if [ "$vlvm" = "Vmess" ]; then
-vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-tls-argo-$hostname-443\", \"add\": \"$cdnip1\", \"port\": \"443\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
+vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"$cdnip1\", \"port\": \"443\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
 echo "$vmatls_link1" >> "$HOME/agsbx/jhsub.txt"
-vmatls_link2="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-tls-argo-$hostname-8443\", \"add\": \"cdn2.YOUR_CDN_DOMAIN\", \"port\": \"8443\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
+vmatls_link2="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn2.YOUR_CDN_DOMAIN\", \"port\": \"8443\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
 echo "$vmatls_link2" >> "$HOME/agsbx/jhsub.txt"
-vmatls_link3="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-tls-argo-$hostname-2053\", \"add\": \"cdn3.YOUR_CDN_DOMAIN\", \"port\": \"2053\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
+vmatls_link3="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn3.YOUR_CDN_DOMAIN\", \"port\": \"2053\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
 echo "$vmatls_link3" >> "$HOME/agsbx/jhsub.txt"
-vmatls_link4="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-tls-argo-$hostname-2083\", \"add\": \"cdn4.YOUR_CDN_DOMAIN\", \"port\": \"2083\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
+vmatls_link4="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn4.YOUR_CDN_DOMAIN\", \"port\": \"2083\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
 echo "$vmatls_link4" >> "$HOME/agsbx/jhsub.txt"
-vmatls_link5="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-tls-argo-$hostname-2087\", \"add\": \"cdn5.YOUR_CDN_DOMAIN\", \"port\": \"2087\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
+vmatls_link5="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn5.YOUR_CDN_DOMAIN\", \"port\": \"2087\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
 echo "$vmatls_link5" >> "$HOME/agsbx/jhsub.txt"
-vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-tls-argo-$hostname-2096\", \"add\": \"[2606:4700::0]\", \"port\": \"2096\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
+vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"[2606:4700::0]\", \"port\": \"2096\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"chrome\"}" | base64 -w0)"
 echo "$vmatls_link6" >> "$HOME/agsbx/jhsub.txt"
-vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-argo-$hostname-80\", \"add\": \"$cdnip2\", \"port\": \"80\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
+vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"$cdnip2\", \"port\": \"80\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vma_link7" >> "$HOME/agsbx/jhsub.txt"
-vma_link8="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-argo-$hostname-8080\", \"add\": \"cdn7.YOUR_CDN_DOMAIN\", \"port\": \"8080\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
+vma_link8="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn7.YOUR_CDN_DOMAIN\", \"port\": \"8080\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vma_link8" >> "$HOME/agsbx/jhsub.txt"
-vma_link9="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-argo-$hostname-8880\", \"add\": \"cdn8.YOUR_CDN_DOMAIN\", \"port\": \"8880\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
+vma_link9="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn8.YOUR_CDN_DOMAIN\", \"port\": \"8880\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vma_link9" >> "$HOME/agsbx/jhsub.txt"
-vma_link10="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-argo-$hostname-2052\", \"add\": \"cdn9.YOUR_CDN_DOMAIN\", \"port\": \"2052\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
+vma_link10="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn9.YOUR_CDN_DOMAIN\", \"port\": \"2052\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vma_link10" >> "$HOME/agsbx/jhsub.txt"
-vma_link11="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-argo-$hostname-2082\", \"add\": \"cdn10.YOUR_CDN_DOMAIN\", \"port\": \"2082\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
+vma_link11="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn10.YOUR_CDN_DOMAIN\", \"port\": \"2082\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vma_link11" >> "$HOME/agsbx/jhsub.txt"
-vma_link12="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-argo-$hostname-2086\", \"add\": \"cdn11.YOUR_CDN_DOMAIN\", \"port\": \"2086\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
+vma_link12="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"cdn11.YOUR_CDN_DOMAIN\", \"port\": \"2086\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vma_link12" >> "$HOME/agsbx/jhsub.txt"
-vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"${sxname}vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::0]\", \"port\": \"2095\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
+vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"$hostname\", \"add\": \"[2400:cb00:2049::0]\", \"port\": \"2095\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vma_link13" >> "$HOME/agsbx/jhsub.txt"
 sbvmargopt(){
 cat <<EOF
 {
             "server": "$cdnip1",
             "server_port": 443,
-            "tag": "${sxname}vmess-ws-tls-argo-$hostname-443",
+            "tag": "$hostname",
             "tls": {
                 "enabled": true,
                 "server_name": "$argodomain",
@@ -1853,7 +1870,7 @@ cat <<EOF
 {
             "server": "$cdnip2",
             "server_port": 80,
-            "tag": "${sxname}vmess-ws-argo-$hostname-80",
+            "tag": "$hostname",
             "tls": {
                 "enabled": false,
                 "server_name": "$argodomain",
@@ -1880,12 +1897,12 @@ cat <<EOF
 EOF
 }
 sbvmargopt1(){
-echo "\"${sxname}vmess-ws-tls-argo-$hostname-443\","
-echo "\"${sxname}vmess-ws-argo-$hostname-80\","
+echo "\"$hostname\","
+echo "\"$hostname\","
 }
 clvmargopt(){
 cat <<EOF
-- name: ${sxname}vmess-ws-tls-argo-$hostname-443                         
+- name: $hostname                         
   type: vmess
   server: "$cdnip1"                       
   port: 443                                     
@@ -1900,7 +1917,7 @@ cat <<EOF
     path: "$uuid-vm"                             
     headers:
       Host: $argodomain
-- name: ${sxname}vmess-ws-argo-$hostname-80                         
+- name: $hostname                         
   type: vmess
   server: "$cdnip2"                        
   port: 80                                     
@@ -1918,13 +1935,13 @@ cat <<EOF
 EOF
 }
 clvmargopt1(){
-echo "- ${sxname}vmess-ws-tls-argo-$hostname-443"
-echo "- ${sxname}vmess-ws-argo-$hostname-80"
+echo "- $hostname"
+echo "- $hostname"
 }
 elif [ "$vlvm" = "Vless" ]; then
-vwatls_link1="vless://$uuid@$cdnip1:443?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=tls&sni=$argodomain&fp=chrome&insecure=0&allowInsecure=0#${sxname}vless-ws-tls-argo-enc-vision-$hostname"
+vwatls_link1="vless://$uuid@$cdnip1:443?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=tls&sni=$argodomain&fp=chrome&insecure=0&allowInsecure=0#$hostname"
 echo "$vwatls_link1" >> "$HOME/agsbx/jhsub.txt"
-vwa_link2="vless://$uuid@$cdnip2:80?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=none#${sxname}vless-ws-argo-enc-vision-$hostname"
+vwa_link2="vless://$uuid@$cdnip2:80?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=none#$hostname"
 echo "$vwa_link2" >> "$HOME/agsbx/jhsub.txt"
 fi
 sbtk=$(cat "$HOME/agsbx/sbargotoken.log" 2>/dev/null)
@@ -2206,10 +2223,10 @@ rules:
 EOF
 echo "---------------------------------------------------------"
 echo "$argoshow"
-[ -n "$vmatls_link1" ] && print_link "Argo TLS 443 分享二维码：" "$vmatls_link1"
-[ -n "$vwatls_link1" ] && print_link "Argo TLS 443 分享二维码：" "$vwatls_link1"
-[ -n "$vma_link7" ] && print_link "Argo 80 分享二维码：" "$vma_link7"
-[ -n "$vwa_link2" ] && print_link "Argo 80 分享二维码：" "$vwa_link2"
+[ -n "$vmatls_link1" ] && print_link "Argo TLS 443 节点分享链接：" "$vmatls_link1"
+[ -n "$vwatls_link1" ] && print_link "Argo TLS 443 节点分享链接：" "$vwatls_link1"
+[ -n "$vma_link7" ] && print_link "Argo 80 节点分享链接：" "$vma_link7"
+[ -n "$vwa_link2" ] && print_link "Argo 80 节点分享链接：" "$vwa_link2"
 echo
 if [ -s $HOME/agsbx/subport.log ]; then
 showsubport=$(cat $HOME/agsbx/subport.log)
