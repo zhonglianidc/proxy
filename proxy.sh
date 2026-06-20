@@ -1508,6 +1508,14 @@ server_ip=$(cat "$HOME/agsbx/server_ip.log")
 set_node_hostname
 sxname=$(cat "$HOME/agsbx/name" 2>/dev/null)
 xvvmcdnym=$(cat "$HOME/agsbx/cdnym" 2>/dev/null)
+clname_vl="${hostname}-Reality"
+clname_ss="${hostname}-SS"
+clname_vm="${hostname}-Vmess"
+clname_an="${hostname}-AnyTLS"
+clname_hy="${hostname}-Hysteria2"
+clname_tu="${hostname}-TUIC"
+clname_argo_tls="${hostname}-ArgoTLS"
+clname_argo="${hostname}-Argo"
 echo "*********************************************************"
 echo "*********************************************************"
 echo "一键节点脚本生成"
@@ -1601,7 +1609,7 @@ echo "\"$hostname\","
 }
 clvlpt(){
 cat <<EOF
-- name: $hostname               
+- name: "$clname_vl"
   type: vless
   server: $server_ip                          
   port: $port_vl_re                                
@@ -1618,7 +1626,7 @@ cat <<EOF
 EOF
 }
 clvlpt1(){
-echo "- $hostname"
+echo "- \"$clname_vl\""
 }
 fi
 if grep '"tag":"ss"' "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
@@ -1649,7 +1657,7 @@ echo "\"$hostname\","
 }
 clsspt(){
 cat <<EOF
-- name: "$hostname"
+- name: "$clname_ss"
   type: ss
   server: $server_ip
   port: $port_ss
@@ -1661,7 +1669,7 @@ cat <<EOF
 EOF
 }
 clsspt1(){
-echo "- $hostname"
+echo "- \"$clname_ss\""
 }
 fi
 if grep vmess-xr "$HOME/agsbx/xr.json" >/dev/null 2>&1 || grep vmess-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
@@ -1706,7 +1714,7 @@ echo "\"$hostname\","
 }
 clvmpt(){
 cat <<EOF
-- name: $hostname                         
+- name: "$clname_vm"
   type: vmess
   server: $server_ip                        
   port: $port_vm_ws                                     
@@ -1724,7 +1732,7 @@ cat <<EOF
 EOF
 }
 clvmpt1(){
-echo "- $hostname"
+echo "- \"$clname_vm\""
 }
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vmess WS CDN"
@@ -1764,7 +1772,7 @@ echo "\"$hostname\","
 }
 clanpt(){
 cat <<EOF
-- name: $hostname
+- name: "$clname_an"
   type: anytls
   server: $server_ip
   port: $port_an
@@ -1778,7 +1786,7 @@ cat <<EOF
 EOF
 }
 clanpt1(){
-echo "- $hostname"
+echo "- \"$clname_an\""
 }
 fi
 if grep anyreality-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
@@ -1865,11 +1873,11 @@ echo "\"$hostname\","
 }
 clhypt(){
 cat <<EOF
-- name: $hostname                            
+- name: "$clname_hy"
   type: hysteria2                                      
   server: $server_ip                              
   port: $port_hy2
-  ports: $cmhy2pt
+$( [ -n "$cmhy2pt" ] && printf '  ports: "%s"\n' "$cmhy2pt" )
   password: $uuid                          
   alpn:
     - h3
@@ -1879,7 +1887,7 @@ cat <<EOF
 EOF
 }
 clhypt1(){
-echo "- $hostname"
+echo "- \"$clname_hy\""
 }
 fi
 if grep tuic5-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
@@ -1918,7 +1926,7 @@ echo "\"$hostname\","
 }
 cltupt(){
 cat <<EOF
-- name: $hostname                            
+- name: "$clname_tu"
   server: $server_ip                      
   port: $port_tu                                    
   type: tuic
@@ -1934,7 +1942,7 @@ cat <<EOF
 EOF
 }
 cltupt1(){
-echo "- $hostname"
+echo "- \"$clname_tu\""
 }
 fi
 if grep socks5-xr "$HOME/agsbx/xr.json" >/dev/null 2>&1 || grep socks5-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
@@ -1948,7 +1956,8 @@ printf '\033[1;33m%s\033[0m\n' "端口号：$port_so"
 printf '\033[1;33m%s\033[0m\n' "用户名：$socks5_auth"
 printf '\033[1;33m%s\033[0m\n' "密码：$socks5_auth"
 printf '\033[1;37m%s\033[0m\n' "------------------------------------------------------------"
-printf '\033[1;36m%s\033[0m\n' "指纹浏览器格式：${server_ip}:${port_so}:${socks5_auth}:${socks5_auth}"
+printf '\033[1;36m%s\033[0m' "指纹浏览器格式："
+printf '\033[1;32m%s\033[0m\n' "${server_ip}:${port_so}:${socks5_auth}:${socks5_auth}"
 echo "温馨提示：socks5使用一般需要海外环境。"
 print_link "节点分享链接：" "$socks5_link"
 fi
@@ -2047,7 +2056,7 @@ echo "\"$hostname\","
 }
 clvmargopt(){
 cat <<EOF
-- name: $hostname                         
+- name: "$clname_argo_tls"
   type: vmess
   server: "$cdnip1"                       
   port: 443                                     
@@ -2062,7 +2071,7 @@ cat <<EOF
     path: "$uuid-vm"                             
     headers:
       Host: $argodomain
-- name: $hostname                         
+- name: "$clname_argo"
   type: vmess
   server: "$cdnip2"                        
   port: 80                                     
@@ -2080,8 +2089,8 @@ cat <<EOF
 EOF
 }
 clvmargopt1(){
-echo "- $hostname"
-echo "- $hostname"
+echo "- \"$clname_argo_tls\""
+echo "- \"$clname_argo\""
 }
 elif [ "$vlvm" = "Vless" ]; then
 vwatls_link1="vless://$uuid@$cdnip1:443?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=tls&sni=$argodomain&fp=chrome&insecure=0&allowInsecure=0#$hostname"
@@ -2389,7 +2398,7 @@ fi
 echo
 echo "---------------------------------------------------------"
 printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
-printf '\033[1;31m%s\033[0m\n' "请向上翻看上方输出的节点分享链接和二维码。"
+printf '\033[1;31m%s\033[0m\n' "向上翻看节点分享链接和二维码"
 printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
 echo "聚合节点文件：$HOME/agsbx/jhsub.txt"
 echo "查看节点命令：cat $HOME/agsbx/jhsub.txt"
