@@ -1,5 +1,14 @@
 #!/bin/sh
 SCRIPT_VERSION=${SCRIPT_VERSION:-v1.0.0-20260620}
+PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh}
+if [ "$(id -u 2>/dev/null)" != "0" ]; then
+if command -v sudo >/dev/null 2>&1; then
+echo "当前环境非root用户权限，正在尝试使用 sudo 自动提权..."
+exec sudo -H env SCRIPT_VERSION="$SCRIPT_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" sopt="${sopt-}" vmpt="${vmpt-}" vlpt="${vlpt-}" xhpt="${xhpt-}" vxpt="${vxpt-}" vwpt="${vwpt-}" arpt="${arpt-}" anpt="${anpt-}" hypt="${hypt-}" tupt="${tupt-}" sspt="${sspt-}" warp="${warp-}" ippz="${ippz-}" uuid="${uuid-}" reym="${reym-}" hyjpt="${hyjpt-}" cdnym="${cdnym-}" name="${name-}" sub="${sub-}" subid="${subid-}" subpt="${subpt-}" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
+fi
+echo "当前环境非root用户权限，请先输入 sudo -i 命令"
+exit 1
+fi
 if locale -a 2>/dev/null | grep -qi '^C\.UTF-8$'; then
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
@@ -9,11 +18,7 @@ unset LC_ALL
 fi
 install_dependencies(){
 [ "$1" = "del" ] && return
-if [ "$(id -u 2>/dev/null)" != "0" ]; then
-echo "当前环境非root用户权限，请先输入 sudo -i 命令"
-exit 1
-fi
-required_deps="curl wget unzip tar gzip openssl awk sed grep find qrencode iptables crontab timeout base64 sha256sum tr head xargs readlink pgrep"
+required_deps="curl wget unzip tar gzip openssl awk sed grep find iptables crontab timeout base64 sha256sum tr head xargs readlink pgrep"
 missing=""
 for cmd in $required_deps; do
 command -v "$cmd" >/dev/null 2>&1 || missing="$missing $cmd"
@@ -25,14 +30,18 @@ if command -v apt-get >/dev/null 2>&1; then
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y >/dev/null 2>&1
 printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections 2>/dev/null
-apt-get install -y curl wget ca-certificates bash busybox coreutils util-linux procps iproute2 iptables iptables-persistent cron openssl unzip tar gzip qrencode findutils grep sed gawk xz-utils chrony >/dev/null 2>&1
+apt-get install -y curl wget ca-certificates bash busybox coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus >/dev/null 2>&1
+apt-get install -y qrencode chrony iptables-persistent >/dev/null 2>&1 || apt-get install -y qrencode systemd-timesyncd >/dev/null 2>&1 || true
 elif command -v apk >/dev/null 2>&1; then
 apk update >/dev/null 2>&1
-apk add --no-cache curl wget ca-certificates bash busybox-extras gcompat libc6-compat coreutils util-linux procps iproute2 iptables ip6tables openrc dcron openssl unzip tar gzip qrencode findutils grep sed gawk xz chrony >/dev/null 2>&1
+apk add --no-cache curl wget ca-certificates bash busybox-extras gcompat libc6-compat coreutils util-linux procps iproute2 iptables ip6tables openrc dcron openssl unzip tar gzip findutils grep sed gawk xz >/dev/null 2>&1
+apk add --no-cache qrencode chrony >/dev/null 2>&1 || true
 elif command -v dnf >/dev/null 2>&1; then
-dnf install -y curl wget ca-certificates bash coreutils util-linux procps-ng iproute iptables iptables-services cronie openssl unzip tar gzip qrencode findutils grep sed gawk xz chrony >/dev/null 2>&1
+dnf install -y curl wget ca-certificates bash coreutils util-linux procps-ng iproute iptables iptables-services cronie openssl unzip tar gzip findutils grep sed gawk xz >/dev/null 2>&1
+dnf install -y qrencode chrony >/dev/null 2>&1 || true
 elif command -v yum >/dev/null 2>&1; then
-yum install -y curl wget ca-certificates bash coreutils util-linux procps-ng iproute iptables iptables-services cronie openssl unzip tar gzip qrencode findutils grep sed gawk xz chrony >/dev/null 2>&1
+yum install -y curl wget ca-certificates bash coreutils util-linux procps-ng iproute iptables iptables-services cronie openssl unzip tar gzip findutils grep sed gawk xz >/dev/null 2>&1
+yum install -y qrencode chrony >/dev/null 2>&1 || true
 else
 echo "未识别系统包管理器，请先手动安装 curl/wget/unzip/tar/openssl/iptables/qrencode 等依赖。"
 exit 1
@@ -223,7 +232,6 @@ export ARGO_AUTH=${agk:-''}
 export ippz=${ippz:-''}
 export warp=${warp:-''}
 export name=${name:-''}
-export oap=${oap:-''}
 SCRIPT_GITHUB_USER=${SCRIPT_GITHUB_USER:-zhonglianidc}
 SCRIPT_GITHUB_REPO=${SCRIPT_GITHUB_REPO:-proxy}
 SCRIPT_GITHUB_BRANCH=${SCRIPT_GITHUB_BRANCH:-main}
@@ -1503,7 +1511,7 @@ fi
 }
 ipchange
 rm -rf "$HOME/agsbx/jhsub.txt"
-uuid=$(cat "$HOME/agsbx/uuid")
+uuid=$(cat "$HOME/agsbx/uuid" 2>/dev/null)
 server_ip=$(cat "$HOME/agsbx/server_ip.log")
 set_node_hostname
 sxname=$(cat "$HOME/agsbx/name" 2>/dev/null)
@@ -2536,16 +2544,6 @@ fi
 echo "VPS系统：$op"
 echo "CPU架构：$cpu"
 echo "一键节点脚本生成" && sleep 1
-if [ -n "$oap" ]; then
-setenforce 0 >/dev/null 2>&1
-iptables -P INPUT ACCEPT >/dev/null 2>&1
-iptables -P FORWARD ACCEPT >/dev/null 2>&1
-iptables -P OUTPUT ACCEPT >/dev/null 2>&1
-iptables -F >/dev/null 2>&1
-netfilter-persistent save >/dev/null 2>&1
-echo
-echo "iptables执行开放所有端口"
-fi
 ins
 if [ -n "$sub" ]; then
 subtokenipsub(){

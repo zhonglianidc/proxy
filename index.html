@@ -409,7 +409,7 @@
             <label><input type="checkbox" data-proto="tupt"> Tuic <span class="pill">tupt</span></label><input type="text" placeholder="留空则随机端口" data-port="tupt">
             <label><input type="checkbox" data-proto="anpt"> AnyTLS <span class="pill">anpt</span></label><input type="text" placeholder="留空则随机端口" data-port="anpt">
             <label><input type="checkbox" data-proto="arpt"> Any-reality <span class="pill">arpt</span></label><input type="text" placeholder="留空则随机端口" data-port="arpt">
-            <label><input type="checkbox" data-proto="sspt"> Shadowsocks-2022 <span class="pill">sspt</span></label><input type="text" placeholder="留空则随机端口" data-port="sspt">
+            <label><input type="checkbox" data-proto="sspt"> Shadowsocks <span class="pill">sspt</span></label><input type="text" placeholder="留空则随机端口" data-port="sspt">
           </div>
         </div>
         <div class="protocol-group separator">
@@ -459,13 +459,6 @@
             <option value="">默认 自动</option>
             <option value="4">导出 IPv4</option>
             <option value="6">导出 IPv6</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>当前系统开放所有端口 <span class="pill">oap</span></label>
-          <select id="oap">
-            <option value="">默认 关闭</option>
-            <option value="y">开启 执行一次即可关闭</option>
           </select>
         </div>
         <div class="row"><label>导出节点名称前缀 <span class="pill">name</span></label><input id="name" type="text" placeholder="留空则默认协议名前缀"/></div>
@@ -541,7 +534,7 @@
   const CURL = 'bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)';
   const WGET = 'bash <(wget -qO- https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)';
   const protoKeys = ['sopt','vmpt','vlpt','xhpt','vxpt','vwpt','arpt','anpt','hypt','tupt','sspt'];
-  const optIds = ['warp','ippz','uuid','reym','hyjpt','cdnym','name', 'oap', 'sub', 'subid', 'subpt'];
+  const optIds = ['warp','ippz','uuid','reym','hyjpt','cdnym','name', 'sub', 'subid', 'subpt'];
 
   const argoSelect = document.getElementById('argoSelect');
   const agn = document.getElementById('agn');
@@ -568,7 +561,6 @@
   const checkboxes = document.querySelectorAll('input[type="checkbox"]');
   const textInputs = document.querySelectorAll('input[type="text"]');
   const ippzSelect = document.getElementById('ippz');
-  const oapSelect = document.getElementById('oap');
   const generateUuidBtn = document.getElementById('generateUuidBtn');
   const uuidInput = document.getElementById('uuid');
   const themeSwitchCheckbox = document.getElementById('theme-switch-checkbox');
@@ -623,7 +615,6 @@
     if (!preserveIppz) {
         ippzSelect.value = '';
     }
-    oapSelect.value = '';
     document.getElementById('uuid').value = '';
     document.getElementById('reym').value = '';
     document.getElementById('hyjpt').value = '';
@@ -761,7 +752,6 @@
     if (keys.includes('agn')) ordered.push('agn');
     if (keys.includes('agk')) ordered.push('agk');
     if (keys.includes('cfip')) ordered.push('cfip');
-    if (keys.includes('oap')) ordered.push('oap');
     keys.forEach(k => { if (!ordered.includes(k)) ordered.push(k); });
 
     return ordered.map(k => {
