@@ -4,7 +4,7 @@ PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglian
 if [ "$(id -u 2>/dev/null)" != "0" ]; then
 if command -v sudo >/dev/null 2>&1; then
 echo "当前环境非root用户权限，正在尝试使用 sudo 自动提权..."
-exec sudo -H env SCRIPT_VERSION="$SCRIPT_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" sopt="${sopt-}" vmpt="${vmpt-}" vlpt="${vlpt-}" xhpt="${xhpt-}" vxpt="${vxpt-}" vwpt="${vwpt-}" arpt="${arpt-}" anpt="${anpt-}" hypt="${hypt-}" tupt="${tupt-}" sspt="${sspt-}" warp="${warp-}" ippz="${ippz-}" uuid="${uuid-}" reym="${reym-}" hyjpt="${hyjpt-}" cdnym="${cdnym-}" name="${name-}" sub="${sub-}" subid="${subid-}" subpt="${subpt-}" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
+exec sudo -E -H env SCRIPT_VERSION="$SCRIPT_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
 fi
 echo "当前环境非root用户权限，请先输入 sudo -i 命令"
 exit 1
@@ -205,6 +205,10 @@ enable_network_tuning "$1"
 [ -z "${arpt+x}" ] || arp=yes
 [ -z "${sopt+x}" ] || sop=yes
 [ -z "${warp+x}" ] || wap=yes
+protocol_requested=no
+if [ "$vwp" = yes ] || [ "$sop" = yes ] || [ "$vxp" = yes ] || [ "$ssp" = yes ] || [ "$vlp" = yes ] || [ "$vmp" = yes ] || [ "$hyp" = yes ] || [ "$tup" = yes ] || [ "$xhp" = yes ] || [ "$anp" = yes ] || [ "$arp" = yes ]; then
+protocol_requested=yes
+fi
 if find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -Eq 'agsbx/(s|x)' || pgrep -f 'agsbx/(s|x)' >/dev/null 2>&1; then
 if [ "$1" = "rep" ]; then
 [ "$vwp" = yes ] || [ "$sop" = yes ] || [ "$vxp" = yes ] || [ "$ssp" = yes ] || [ "$vlp" = yes ] || [ "$vmp" = yes ] || [ "$hyp" = yes ] || [ "$tup" = yes ] || [ "$xhp" = yes ] || [ "$anp" = yes ] || [ "$arp" = yes ] || { echo "提示：rep重置协议时，请在脚本前至少设置一个协议变量哦，再见！💣"; exit; }
@@ -2477,7 +2481,7 @@ echo "欢迎继续使用一键节点脚本生成" && sleep 2
 echo
 showmode
 exit
-elif [ "$1" = "rep" ]; then
+elif [ "$1" = "rep" ] || { [ -z "$1" ] && [ "$protocol_requested" = yes ] && { find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -Eq 'agsbx/(s|x)' || pgrep -f 'agsbx/(s|x)' >/dev/null 2>&1; }; }; then
 cleandel
 rm -rf "$HOME/agsbx"/{sb.json,xr.json,sbargoym.log,sbargotoken.log,argo.log,argoport.log,cdnym,name}
 echo "一键节点脚本生成" && sleep 2
