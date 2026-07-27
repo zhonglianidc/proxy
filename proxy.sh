@@ -1141,7 +1141,7 @@ cat >> "$HOME/agsbx/xr.json" <<EOF
   }
 }
 EOF
-if pidof systemd >/dev/null 2>&1 && [ "$EUID" -eq 0 ]; then
+if pidof systemd >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/systemd/system/xr.service <<EOF
 [Unit]
 Description=xr service
@@ -1161,7 +1161,7 @@ EOF
 systemctl daemon-reload >/dev/null 2>&1
 systemctl enable xr >/dev/null 2>&1
 systemctl start xr >/dev/null 2>&1
-elif command -v rc-service >/dev/null 2>&1 && [ "$EUID" -eq 0 ]; then
+elif command -v rc-service >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/init.d/xray <<EOF
 #!/sbin/openrc-run
 description="xr service"
@@ -1232,7 +1232,7 @@ cat >> "$HOME/agsbx/sb.json" <<EOF
   }
 }
 EOF
-if pidof systemd >/dev/null 2>&1 && [ "$EUID" -eq 0 ]; then
+if pidof systemd >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/systemd/system/sb.service <<EOF
 [Unit]
 Description=sb service
@@ -1252,7 +1252,7 @@ EOF
 systemctl daemon-reload >/dev/null 2>&1
 systemctl enable sb >/dev/null 2>&1
 systemctl start sb >/dev/null 2>&1
-elif command -v rc-service >/dev/null 2>&1 && [ "$EUID" -eq 0 ]; then
+elif command -v rc-service >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/init.d/sing-box <<EOF
 #!/sbin/openrc-run
 description="sb service"
@@ -1308,7 +1308,7 @@ fi
 if [ "$argo" = "vmpt" ]; then argoport=$(cat "$HOME/agsbx/port_vm_ws" 2>/dev/null); echo "Vmess" > "$HOME/agsbx/vlvm"; elif [ "$argo" = "vwpt" ]; then argoport=$(cat "$HOME/agsbx/port_vw" 2>/dev/null); echo "Vless" > "$HOME/agsbx/vlvm"; fi; echo "$argoport" > "$HOME/agsbx/argoport.log"
 if [ -n "${ARGO_DOMAIN}" ] && [ -n "${ARGO_AUTH}" ]; then
 argoname='固定'
-if pidof systemd >/dev/null 2>&1 && [ "$EUID" -eq 0 ]; then
+if pidof systemd >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/systemd/system/argo.service <<EOF
 [Unit]
 Description=argo service
@@ -1326,7 +1326,7 @@ EOF
 systemctl daemon-reload >/dev/null 2>&1
 systemctl enable argo >/dev/null 2>&1
 systemctl start argo >/dev/null 2>&1
-elif command -v rc-service >/dev/null 2>&1 && [ "$EUID" -eq 0 ]; then
+elif command -v rc-service >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/init.d/argo <<EOF
 #!/sbin/openrc-run
 description="argo service"
