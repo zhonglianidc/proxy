@@ -1,10 +1,26 @@
 #!/bin/sh
 SCRIPT_VERSION=${SCRIPT_VERSION:-v1.0.0-20260620}
 PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh}
+if [ -z "${PROXY_SELECTED_KEYS+x}" ]; then
+PROXY_SELECTED_KEYS=""
+[ -z "${sopt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS sopt"
+[ -z "${vmpt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS vmpt"
+[ -z "${vlpt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS vlpt"
+[ -z "${xhpt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS xhpt"
+[ -z "${vxpt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS vxpt"
+[ -z "${vwpt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS vwpt"
+[ -z "${arpt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS arpt"
+[ -z "${anpt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS anpt"
+[ -z "${hypt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS hypt"
+[ -z "${tupt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS tupt"
+[ -z "${sspt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS sspt"
+[ -z "${warp+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS warp"
+export PROXY_SELECTED_KEYS
+fi
 if [ "$(id -u 2>/dev/null)" != "0" ]; then
 if command -v sudo >/dev/null 2>&1; then
 echo "当前环境非root用户权限，正在尝试使用 sudo 自动提权..."
-exec sudo -E -H env SCRIPT_VERSION="$SCRIPT_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
+exec sudo -E -H env SCRIPT_VERSION="$SCRIPT_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
 fi
 echo "当前环境非root用户权限，请先输入 sudo -i 命令"
 exit 1
@@ -193,18 +209,18 @@ fi
 setup_time_sync_job "$1"
 disable_system_firewall "$1"
 enable_network_tuning "$1"
-[ -z "${vlpt+x}" ] || vlp=yes
-[ -z "${vmpt+x}" ] || { vmp=yes; vmag=yes; }
-[ -z "${vwpt+x}" ] || { vwp=yes; vmag=yes; }
-[ -z "${hypt+x}" ] || hyp=yes
-[ -z "${tupt+x}" ] || tup=yes
-[ -z "${xhpt+x}" ] || xhp=yes
-[ -z "${vxpt+x}" ] || vxp=yes
-[ -z "${anpt+x}" ] || anp=yes
-[ -z "${sspt+x}" ] || ssp=yes
-[ -z "${arpt+x}" ] || arp=yes
-[ -z "${sopt+x}" ] || sop=yes
-[ -z "${warp+x}" ] || wap=yes
+case " $PROXY_SELECTED_KEYS " in *" vlpt "*) vlp=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" vmpt "*) vmp=yes; vmag=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" vwpt "*) vwp=yes; vmag=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" hypt "*) hyp=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" tupt "*) tup=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" xhpt "*) xhp=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" vxpt "*) vxp=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" anpt "*) anp=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" sspt "*) ssp=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" arpt "*) arp=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" sopt "*) sop=yes ;; esac
+case " $PROXY_SELECTED_KEYS " in *" warp "*) wap=yes ;; esac
 protocol_requested=no
 if [ "$vwp" = yes ] || [ "$sop" = yes ] || [ "$vxp" = yes ] || [ "$ssp" = yes ] || [ "$vlp" = yes ] || [ "$vmp" = yes ] || [ "$hyp" = yes ] || [ "$tup" = yes ] || [ "$xhp" = yes ] || [ "$anp" = yes ] || [ "$arp" = yes ]; then
 protocol_requested=yes
