@@ -32,6 +32,22 @@ else
 export LANG=C
 unset LC_ALL
 fi
+prepare_apt_noninteractive(){
+for apt_hook in 20packagekit 50command-not-found 99needrestart 99update-notifier; do
+if [ -f "/etc/apt/apt.conf.d/$apt_hook" ] && [ ! -f "/etc/apt/apt.conf.d/$apt_hook.proxybak" ]; then
+mv "/etc/apt/apt.conf.d/$apt_hook" "/etc/apt/apt.conf.d/$apt_hook.proxybak" 2>/dev/null || true
+fi
+done
+}
+apt_run(){
+apt_action="$1"
+shift
+if command -v timeout >/dev/null 2>&1; then
+timeout "$apt_action" apt-get -o DPkg::Lock::Timeout=60 -o APT::Update::Post-Invoke-Success::= -o DPkg::Post-Invoke::= "$@"
+else
+apt-get -o DPkg::Lock::Timeout=60 -o APT::Update::Post-Invoke-Success::= -o DPkg::Post-Invoke::= "$@"
+fi
+}
 install_dependencies(){
 [ "$1" = "del" ] && return
 required_deps="curl wget unzip tar gzip openssl awk sed grep find iptables crontab timeout base64 sha256sum tr head xargs readlink pgrep"
@@ -44,10 +60,11 @@ echo "正在检查并安装脚本运行依赖，请稍等..."
 mkdir -p "$HOME/agsbx"
 if command -v apt-get >/dev/null 2>&1; then
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y >/dev/null 2>&1
+prepare_apt_noninteractive
+apt_run 180 update -y >/dev/null 2>&1 || echo "apt-get update 超时或失败，继续尝试安装基础依赖..."
 printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections 2>/dev/null
-apt-get install -y curl wget ca-certificates bash busybox coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus >/dev/null 2>&1
-apt-get install -y qrencode chrony iptables-persistent >/dev/null 2>&1 || apt-get install -y qrencode systemd-timesyncd >/dev/null 2>&1 || true
+apt_run 300 install -y curl wget ca-certificates bash busybox coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus >/dev/null 2>&1
+apt_run 180 install -y qrencode chrony iptables-persistent >/dev/null 2>&1 || apt_run 180 install -y qrencode systemd-timesyncd >/dev/null 2>&1 || true
 elif command -v apk >/dev/null 2>&1; then
 apk update >/dev/null 2>&1
 apk add --no-cache curl wget ca-certificates bash busybox-extras gcompat libc6-compat coreutils util-linux procps iproute2 iptables ip6tables openrc dcron openssl unzip tar gzip findutils grep sed gawk xz >/dev/null 2>&1
@@ -462,7 +479,9 @@ showqrcode(){
 qrtext="$1"
 if ! command -v qrencode >/dev/null 2>&1; then
 if command -v apt-get >/dev/null 2>&1; then
-apt-get update -y >/dev/null 2>&1 && apt-get install -y qrencode >/dev/null 2>&1
+prepare_apt_noninteractive
+apt_run 180 update -y >/dev/null 2>&1 || true
+apt_run 180 install -y qrencode >/dev/null 2>&1 || true
 elif command -v apk >/dev/null 2>&1; then
 apk add --no-cache qrencode >/dev/null 2>&1
 elif command -v yum >/dev/null 2>&1; then
