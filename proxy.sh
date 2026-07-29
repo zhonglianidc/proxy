@@ -33,6 +33,11 @@ export LANG=C
 unset LC_ALL
 fi
 prepare_apt_noninteractive(){
+if command -v systemctl >/dev/null 2>&1; then
+systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service >/dev/null 2>&1 || true
+systemctl disable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+fi
+pkill -f 'apt.systemd.daily|unattended-upgrade' >/dev/null 2>&1 || true
 for apt_hook in 20packagekit 50command-not-found 99needrestart 99update-notifier; do
 if [ -f "/etc/apt/apt.conf.d/$apt_hook" ] && [ ! -f "/etc/apt/apt.conf.d/$apt_hook.proxybak" ]; then
 mv "/etc/apt/apt.conf.d/$apt_hook" "/etc/apt/apt.conf.d/$apt_hook.proxybak" 2>/dev/null || true
@@ -63,8 +68,9 @@ export DEBIAN_FRONTEND=noninteractive
 prepare_apt_noninteractive
 apt_run 180 update -y >/dev/null 2>&1 || echo "apt-get update 超时或失败，继续尝试安装基础依赖..."
 printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections 2>/dev/null
-apt_run 300 install -y curl wget ca-certificates bash busybox coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus >/dev/null 2>&1
-apt_run 180 install -y qrencode chrony iptables-persistent >/dev/null 2>&1 || apt_run 180 install -y qrencode systemd-timesyncd >/dev/null 2>&1 || true
+apt_run 300 install -y --no-install-recommends --no-upgrade curl wget ca-certificates bash coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus >/dev/null 2>&1
+command -v busybox >/dev/null 2>&1 || apt_run 180 install -y --no-install-recommends --no-upgrade busybox-static >/dev/null 2>&1 || true
+command -v qrencode >/dev/null 2>&1 || apt_run 180 install -y --no-install-recommends --no-upgrade qrencode >/dev/null 2>&1 || true
 elif command -v apk >/dev/null 2>&1; then
 apk update >/dev/null 2>&1
 apk add --no-cache curl wget ca-certificates bash busybox-extras gcompat libc6-compat coreutils util-linux procps iproute2 iptables ip6tables openrc dcron openssl unzip tar gzip findutils grep sed gawk xz >/dev/null 2>&1
