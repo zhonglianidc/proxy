@@ -48,9 +48,13 @@ apt_run(){
 apt_action="$1"
 shift
 if command -v timeout >/dev/null 2>&1; then
-timeout "$apt_action" apt-get -o DPkg::Lock::Timeout=60 -o APT::Update::Post-Invoke-Success::= -o DPkg::Post-Invoke::= "$@"
+if timeout --help 2>/dev/null | grep -q -- '--foreground'; then
+timeout --foreground "$apt_action" apt-get -o DPkg::Lock::Timeout=60 -o APT::Update::Post-Invoke-Success::= -o DPkg::Post-Invoke::= "$@" </dev/null
 else
-apt-get -o DPkg::Lock::Timeout=60 -o APT::Update::Post-Invoke-Success::= -o DPkg::Post-Invoke::= "$@"
+timeout "$apt_action" apt-get -o DPkg::Lock::Timeout=60 -o APT::Update::Post-Invoke-Success::= -o DPkg::Post-Invoke::= "$@" </dev/null
+fi
+else
+apt-get -o DPkg::Lock::Timeout=60 -o APT::Update::Post-Invoke-Success::= -o DPkg::Post-Invoke::= "$@" </dev/null
 fi
 }
 install_dependencies(){
