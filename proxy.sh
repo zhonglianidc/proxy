@@ -326,6 +326,44 @@ v6=$( (command -v curl >/dev/null 2>&1 && curl -s6m5 -k "$v46url" 2>/dev/null) |
 v4dq=$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k https://myip.ipip.net/ | awk -F'来自于：' '{print $2}' 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -4 --tries=2 -qO- https://myip.ipip.net/ | awk -F'来自于：' '{print $2}' 2>/dev/null) )
 v6dq=$( (command -v curl >/dev/null 2>&1 && curl -s6m5 -k https://ip.fm | sed -n 's/.*Location: //p' 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 --tries=2 -qO- https://ip.fm | grep '<span class="has-text-grey-light">Location:' | tail -n1 | sed -E 's/.*>Location: <\/span>([^<]+)<.*/\1/' 2>/dev/null) )
 }
+country_code_cn(){
+case "$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" in
+CN) echo "中国" ;; HK) echo "香港" ;; MO) echo "澳门" ;; TW) echo "台湾" ;;
+US) echo "美国" ;; DE) echo "德国" ;; JP) echo "日本" ;; SG) echo "新加坡" ;;
+KR) echo "韩国" ;; GB|UK) echo "英国" ;; FR) echo "法国" ;; NL) echo "荷兰" ;;
+CA) echo "加拿大" ;; AU) echo "澳大利亚" ;; BR) echo "巴西" ;; RU) echo "俄罗斯" ;;
+IN) echo "印度" ;; TH) echo "泰国" ;; VN) echo "越南" ;; MY) echo "马来西亚" ;;
+ID) echo "印度尼西亚" ;; PH) echo "菲律宾" ;; TR) echo "土耳其" ;; AE) echo "阿联酋" ;;
+*) echo "" ;;
+esac
+}
+geo_country(){
+geo_ip="$1"
+geo_country_name=""
+geo_country_code=""
+if command -v curl >/dev/null 2>&1; then
+geo_info=$(curl -s --max-time 6 "https://ipinfo.io/${geo_ip}/json" 2>/dev/null)
+geo_country_code=$(printf '%s' "$geo_info" | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+[ -n "$geo_country_code" ] && geo_country_name=$(country_code_cn "$geo_country_code")
+[ -z "$geo_country_name" ] && geo_country_name=$(curl -s --max-time 6 "https://ipwho.is/${geo_ip}?lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+[ -z "$geo_country_name" ] && geo_country_name=$(curl -s --max-time 6 "http://ip-api.com/json/${geo_ip}?fields=country&lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+elif command -v wget >/dev/null 2>&1; then
+if timeout --help 2>/dev/null | grep -q -- '--foreground'; then
+geo_info=$(timeout --foreground 6 wget -qO- "https://ipinfo.io/${geo_ip}/json" 2>/dev/null)
+geo_country_code=$(printf '%s' "$geo_info" | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+[ -n "$geo_country_code" ] && geo_country_name=$(country_code_cn "$geo_country_code")
+[ -z "$geo_country_name" ] && geo_country_name=$(timeout --foreground 6 wget -qO- "https://ipwho.is/${geo_ip}?lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+[ -z "$geo_country_name" ] && geo_country_name=$(timeout --foreground 6 wget -qO- "http://ip-api.com/json/${geo_ip}?fields=country&lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+else
+geo_info=$(timeout 6 wget -qO- "https://ipinfo.io/${geo_ip}/json" 2>/dev/null)
+geo_country_code=$(printf '%s' "$geo_info" | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+[ -n "$geo_country_code" ] && geo_country_name=$(country_code_cn "$geo_country_code")
+[ -z "$geo_country_name" ] && geo_country_name=$(timeout 6 wget -qO- "https://ipwho.is/${geo_ip}?lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+[ -z "$geo_country_name" ] && geo_country_name=$(timeout 6 wget -qO- "http://ip-api.com/json/${geo_ip}?fields=country&lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+fi
+fi
+printf '%s' "$geo_country_name"
+}
 warpsx(){
 warpurl=$( (command -v curl >/dev/null 2>&1 && curl -sm5 -k https://warp.xijp.eu.org 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget --tries=2 -qO- https://warp.xijp.eu.org 2>/dev/null) )
 if [ -z "$warpurl" ] || printf '%s' "$warpurl" | grep -q html; then
@@ -1498,12 +1536,7 @@ set_node_hostname(){
 node_ip="$server_ip"
 node_ip=${node_ip#\[}
 node_ip=${node_ip%\]}
-node_country=""
-if command -v curl >/dev/null 2>&1; then
-node_country=$(curl -s --max-time 5 "http://ip-api.com/json/${node_ip}?fields=country&lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-elif command -v wget >/dev/null 2>&1; then
-node_country=$(timeout 5 wget -qO- "http://ip-api.com/json/${node_ip}?fields=country&lang=zh-CN" 2>/dev/null | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-fi
+node_country=$(geo_country "$node_ip")
 [ -z "$node_country" ] && node_country=$(printf '%s' "$location" | awk '{print $1}')
 [ -z "$node_country" ] && node_country="未知"
 node_country=$(printf '%s' "$node_country" | sed 's/[[:space:]]//g')
