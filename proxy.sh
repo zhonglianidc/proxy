@@ -32,6 +32,16 @@ else
 export LANG=C
 unset LC_ALL
 fi
+PROXY_PROGRESS_ENABLED=0
+case "$1" in
+""|rep) PROXY_PROGRESS_ENABLED=1 ;;
+esac
+show_progress(){
+[ "$PROXY_PROGRESS_ENABLED" = 1 ] || return 0
+progress_percent="$1"
+shift
+printf '\033[1;36m[%3s%%]\033[0m %s\n' "$progress_percent" "$*"
+}
 prepare_apt_noninteractive(){
 if command -v systemctl >/dev/null 2>&1; then
 systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service >/dev/null 2>&1 || true
@@ -65,14 +75,18 @@ for cmd in $required_deps; do
 command -v "$cmd" >/dev/null 2>&1 || missing="$missing $cmd"
 done
 [ -f "$HOME/agsbx/.deps_ok" ] && [ -z "$missing" ] && return
+show_progress 5 "检查并安装运行依赖"
 echo "正在检查并安装脚本运行依赖，请稍等..."
 mkdir -p "$HOME/agsbx"
 if command -v apt-get >/dev/null 2>&1; then
 export DEBIAN_FRONTEND=noninteractive
 prepare_apt_noninteractive
+show_progress 8 "刷新系统软件源"
 apt_run 180 update -y >/dev/null 2>&1 || echo "apt-get update 超时或失败，继续尝试安装基础依赖..."
 printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections 2>/dev/null
+show_progress 15 "安装基础依赖包"
 apt_run 300 install -y --no-install-recommends --no-upgrade curl wget ca-certificates bash coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus >/dev/null 2>&1
+show_progress 22 "检查二维码和订阅服务组件"
 command -v busybox >/dev/null 2>&1 || apt_run 180 install -y --no-install-recommends --no-upgrade busybox-static >/dev/null 2>&1 || true
 command -v qrencode >/dev/null 2>&1 || apt_run 180 install -y --no-install-recommends --no-upgrade qrencode >/dev/null 2>&1 || true
 elif command -v apk >/dev/null 2>&1; then
@@ -99,6 +113,7 @@ echo "请检查系统软件源是否可用，然后重新运行脚本。"
 exit 1
 fi
 touch "$HOME/agsbx/.deps_ok"
+show_progress 28 "依赖检查完成"
 echo "依赖检查完成。"
 }
 sync_system_time(){
@@ -116,7 +131,9 @@ if command -v chronyc >/dev/null 2>&1; then
 chronyc -a makestep >/dev/null 2>&1
 fi
 }
+show_progress 3 "准备运行环境"
 install_dependencies "$1"
+show_progress 30 "校正系统时间"
 sync_system_time "$1"
 setup_time_sync_job(){
 [ "$1" = "del" ] && return
@@ -233,8 +250,11 @@ sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
 sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
 fi
 }
+show_progress 33 "配置自动校时任务"
 setup_time_sync_job "$1"
+show_progress 35 "检查并关闭系统防火墙"
 disable_system_firewall "$1"
+show_progress 38 "应用网络参数和BBR优化"
 enable_network_tuning "$1"
 case " $PROXY_SELECTED_KEYS " in *" vlpt "*) vlp=yes ;; esac
 case " $PROXY_SELECTED_KEYS " in *" vmpt "*) vmp=yes; vmag=yes ;; esac
@@ -1341,29 +1361,41 @@ fi
 fi
 }
 ins(){
+show_progress 40 "开始生成节点核心配置"
 if [ "$hyp" != yes ] && [ "$tup" != yes ] && [ "$anp" != yes ] && [ "$arp" != yes ] && [ "$ssp" != yes ]; then
+show_progress 45 "安装或检查 Xray 内核"
 installxray
+show_progress 58 "生成 Xray 协议配置"
 xrsbvm
 xrsbso
+show_progress 68 "配置出站和网络分流"
 warpsx
 xrsbout
 hyp="hyptargo"; tup="tuptargo"; anp="anptargo"; arp="arptargo"; ssp="ssptargo"
 elif [ "$xhp" != yes ] && [ "$vlp" != yes ] && [ "$vxp" != yes ] && [ "$vwp" != yes ]; then
+show_progress 45 "安装或检查 Sing-box 内核"
 installsb
+show_progress 58 "生成 Sing-box 协议配置"
 xrsbvm
 xrsbso
+show_progress 68 "配置出站和网络分流"
 warpsx
 xrsbout
 xhp="xhptargo"; vlp="vlptargo"; vxp="vxptargo"; vwp="vwptargo"
 else
+show_progress 45 "安装或检查 Sing-box 内核"
 installsb
+show_progress 55 "安装或检查 Xray 内核"
 installxray
+show_progress 65 "生成协议配置"
 xrsbvm
 xrsbso
+show_progress 72 "配置出站和网络分流"
 warpsx
 xrsbout
 fi
 if [ -n "$argo" ] && [ -n "$vmag" ]; then
+show_progress 76 "配置 Argo 隧道"
 echo
 echo "=========启用Cloudflared-argo内核========="
 if [ ! -e "$HOME/agsbx/cloudflared" ]; then
@@ -2626,8 +2658,10 @@ fi
 echo "VPS系统：$op"
 echo "CPU架构：$cpu"
 echo "一键节点脚本生成" && sleep 1
+show_progress 42 "准备下载内核和写入配置"
 ins
 if [ -n "$sub" ]; then
+show_progress 82 "生成订阅文件和本地订阅服务"
 subtokenipsub(){
 if [ -z "$subid" ]; then
 subtoken="$(cat "$HOME/agsbx/uuid")"
@@ -2680,6 +2714,7 @@ fi
 echo "本地IP订阅链接已更新完成"
 fi
 if [ -n "$hyjpt" ] && [ -n "$hyp" ]; then
+show_progress 88 "配置 Hysteria2 跳跃端口"
 echo
 echo "设置Hysteria2协议的跳跃端口：$hyjpt"
 iptables -t nat -F PREROUTING >/dev/null 2>&1
@@ -2697,7 +2732,9 @@ rc-service iptables save >/dev/null 2>&1
 rc-service ip6tables save >/dev/null 2>&1
 fi
 fi
+show_progress 92 "整理节点分享链接和二维码"
 cip
+show_progress 100 "安装完成"
 echo
 else
 echo "一键节点脚本生成"
