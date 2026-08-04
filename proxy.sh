@@ -67,6 +67,21 @@ else
 apt-get -o DPkg::Lock::Timeout=60 -o APT::Update::Post-Invoke-Success::= -o DPkg::Post-Invoke::= "$@" </dev/null
 fi
 }
+apt_lists_fresh(){
+apt_update_skip_seconds=${APT_UPDATE_SKIP_SECONDS:-43200}
+now_ts=$(date +%s 2>/dev/null || echo 0)
+[ "$now_ts" -gt 0 ] || return 1
+latest_ts=0
+for apt_list_file in /var/lib/apt/periodic/update-success-stamp /var/lib/apt/lists/*_InRelease /var/lib/apt/lists/*_Packages; do
+[ -e "$apt_list_file" ] || continue
+file_ts=$(date -r "$apt_list_file" +%s 2>/dev/null || stat -c %Y "$apt_list_file" 2>/dev/null || echo 0)
+[ "$file_ts" -gt "$latest_ts" ] 2>/dev/null && latest_ts="$file_ts"
+done
+[ "$latest_ts" -gt 0 ] || return 1
+age_ts=$((now_ts - latest_ts))
+[ "$age_ts" -ge 0 ] 2>/dev/null || return 1
+[ "$age_ts" -lt "$apt_update_skip_seconds" ] 2>/dev/null
+}
 install_dependencies(){
 [ "$1" = "del" ] && return
 required_deps="curl wget unzip tar gzip openssl awk sed grep find iptables crontab timeout base64 sha256sum tr head xargs readlink pgrep"
@@ -82,7 +97,11 @@ if command -v apt-get >/dev/null 2>&1; then
 export DEBIAN_FRONTEND=noninteractive
 prepare_apt_noninteractive
 show_progress 8 "刷新系统软件源"
+if apt_lists_fresh; then
+echo "系统软件源 12 小时内已刷新，跳过 apt-get update。"
+else
 apt_run 180 update -y >/dev/null 2>&1 || echo "apt-get update 超时或失败，继续尝试安装基础依赖..."
+fi
 printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections 2>/dev/null
 show_progress 15 "安装基础依赖包"
 apt_run 300 install -y --no-install-recommends --no-upgrade curl wget ca-certificates bash coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus >/dev/null 2>&1
@@ -559,7 +578,11 @@ dnf install -y qrencode >/dev/null 2>&1
 fi
 fi
 if command -v qrencode >/dev/null 2>&1; then
-qrencode -t UTF8 -m 0 -l L -v 10 "$qrtext" 2>/dev/null || qrencode -t UTF8 -m 0 -l L "$qrtext" 2>/dev/null || qrencode -t ANSIUTF8 -m 0 -l L "$qrtext" 2>/dev/null || qrencode -t UTF8 -m 0 "$qrtext"
+if command -v timeout >/dev/null 2>&1; then
+timeout 10 qrencode -t UTF8 -m 1 -l L "$qrtext" 2>/dev/null || timeout 10 qrencode -t ANSIUTF8 -m 1 -l L "$qrtext" 2>/dev/null || echo "二维码显示超时，请使用上方节点分享链接手动导入。"
+else
+qrencode -t UTF8 -m 1 -l L "$qrtext" 2>/dev/null || qrencode -t ANSIUTF8 -m 1 -l L "$qrtext" 2>/dev/null || echo "二维码显示失败，请使用上方节点分享链接手动导入。"
+fi
 else
 echo "qrencode is not installed, QR code cannot be shown in terminal."
 fi
@@ -1361,7 +1384,7 @@ fi
 fi
 }
 ins(){
-show_progress 40 "开始生成节点核心配置"
+show_progress 42 "开始生成节点核心配置"
 if [ "$hyp" != yes ] && [ "$tup" != yes ] && [ "$anp" != yes ] && [ "$arp" != yes ] && [ "$ssp" != yes ]; then
 show_progress 45 "安装或检查 Xray 内核"
 installxray
@@ -2658,7 +2681,7 @@ fi
 echo "VPS系统：$op"
 echo "CPU架构：$cpu"
 echo "一键节点脚本生成" && sleep 1
-show_progress 42 "准备下载内核和写入配置"
+show_progress 40 "准备下载内核和写入配置"
 ins
 if [ -n "$sub" ]; then
 show_progress 82 "生成订阅文件和本地订阅服务"
