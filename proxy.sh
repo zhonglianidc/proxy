@@ -2296,7 +2296,7 @@ EOF
 else
 hyps=
 fi
-hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1$hyps&sni=www.bing.com#$hostname"
+hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&pinSHA256=$SHA256$hyps&sni=www.bing.com#$hostname"
 echo "$hy2_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$hy2_link" "hysteria2"
 sbhypt(){
