@@ -700,9 +700,14 @@ textarea{width:100%;min-height:126px;resize:vertical;border:1px solid #2d3b68;bo
 </div>
 <div class="grid">
 EOF
+socks_txt=""
 for qrtxt in "$qrdir"/*.txt; do
 [ -f "$qrtxt" ] || continue
 qrbase=$(basename "$qrtxt" .txt)
+if [ "$qrbase" = "socks5" ]; then
+socks_txt="$qrtxt"
+continue
+fi
 qrpng="$qrdir/$qrbase.png"
 qrtxt="$qrdir/$qrbase.txt"
 qrlink=$(cat "$qrtxt" 2>/dev/null)
@@ -710,29 +715,6 @@ escname=$(html_escape "$qrbase")
 display_name=$(qr_display_name "$qrbase")
 escdisplay=$(html_escape "$display_name")
 esclink=$(html_escape "$qrlink")
-if [ "$qrbase" = "socks5" ]; then
-SOCKS5_IP=$(html_escape "$(sed -n 's/^客户端IP：//p' "$qrtxt" | head -n 1)")
-SOCKS5_PORT=$(html_escape "$(sed -n 's/^端口号：//p' "$qrtxt" | head -n 1)")
-SOCKS5_USER=$(html_escape "$(sed -n 's/^用户名：//p' "$qrtxt" | head -n 1)")
-SOCKS5_PASS=$(html_escape "$(sed -n 's/^密码：//p' "$qrtxt" | head -n 1)")
-cat >> "$indexfile" <<EOF
-<div class="card socks-card">
-<div class="card-head"><div class="protocol-pill">$escname</div></div>
-<div class="socks-layout">
-<p class="socks-note">Socks5 不生成二维码，适合指纹浏览器或代理软件手动填写。</p>
-<div class="info-list">
-<div><span>客户端IP</span><strong>$SOCKS5_IP</strong></div>
-<div><span>端口号</span><strong>$SOCKS5_PORT</strong></div>
-<div><span>用户名</span><strong>$SOCKS5_USER</strong></div>
-<div><span>密码</span><strong>$SOCKS5_PASS</strong></div>
-</div>
-<div class="copy-row"><div class="label">Socks5 节点信息</div><button class="copy-btn" type="button" data-copy="node-$escname">复制</button></div>
-<textarea id="node-$escname" readonly>$esclink</textarea>
-</div>
-</div>
-EOF
-continue
-fi
 cat >> "$indexfile" <<EOF
 <div class="card">
 <div class="card-head"><div class="protocol-pill">$escname</div></div>
@@ -754,6 +736,32 @@ cat >> "$indexfile" <<EOF
 </div>
 EOF
 done
+if [ -n "$socks_txt" ] && [ -f "$socks_txt" ]; then
+qrbase="socks5"
+escname="socks5"
+qrlink=$(cat "$socks_txt" 2>/dev/null)
+esclink=$(html_escape "$qrlink")
+SOCKS5_IP=$(html_escape "$(sed -n 's/^客户端IP：//p' "$socks_txt" | head -n 1)")
+SOCKS5_PORT=$(html_escape "$(sed -n 's/^端口号：//p' "$socks_txt" | head -n 1)")
+SOCKS5_USER=$(html_escape "$(sed -n 's/^用户名：//p' "$socks_txt" | head -n 1)")
+SOCKS5_PASS=$(html_escape "$(sed -n 's/^密码：//p' "$socks_txt" | head -n 1)")
+cat >> "$indexfile" <<EOF
+<div class="card socks-card">
+<div class="card-head"><div class="protocol-pill">$escname</div></div>
+<div class="socks-layout">
+<p class="socks-note">Socks5 不生成二维码，适合指纹浏览器或代理软件手动填写。</p>
+<div class="info-list">
+<div><span>客户端IP</span><strong>$SOCKS5_IP</strong></div>
+<div><span>端口号</span><strong>$SOCKS5_PORT</strong></div>
+<div><span>用户名</span><strong>$SOCKS5_USER</strong></div>
+<div><span>密码</span><strong>$SOCKS5_PASS</strong></div>
+</div>
+<div class="copy-row"><div class="label">Socks5 节点信息</div><button class="copy-btn" type="button" data-copy="node-$escname">复制</button></div>
+<textarea id="node-$escname" readonly>$esclink</textarea>
+</div>
+</div>
+EOF
+fi
 cat >> "$indexfile" <<'EOF'
 </div>
 </div>
@@ -2836,15 +2844,16 @@ echo "Clash/Mihomo本地IP订阅地址：http://$suburl/clmi.yaml"
 echo "Sing-box本地IP订阅地址：http://$suburl/sbox.json"
 echo "聚合协议本地IP订阅地址：http://$suburl/jhsub.txt"
 generate_qr_index
-echo "节点信息汇总网页地址：http://$suburl/qrcodes/index.html"
-echo "提示：请用网页浏览器打开上方汇总网页，可查看全部节点信息并复制使用。"
+printf '\033[1;33m%s\033[0m\n' "二维码请在游览器打开下面网址"
+printf '\033[1;32m%s\033[0m\n' "http://$suburl/qrcodes/index.html"
+printf '\033[1;36m%s\033[0m\n' "提示：请用网页浏览器打开上方汇总网页，可查看全部节点信息并复制使用。"
 echo "**********************************************************"
 fi
 fi
 echo
 echo "---------------------------------------------------------"
 printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
-printf '\033[1;31m%s\033[0m\n' "向上翻看节点分享链接和节点信息汇总网页地址"
+printf '\033[1;31m%s\033[0m\n' "向上翻看节点分享链接和二维码网页地址"
 printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
 echo "聚合节点文件：$HOME/agsbx/jhsub.txt"
 echo "查看节点命令：cat $HOME/agsbx/jhsub.txt"
