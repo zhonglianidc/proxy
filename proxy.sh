@@ -3068,8 +3068,6 @@ echo
 echo
 echo "**********************************************************"
 echo "Clash/Mihomo本地IP订阅地址：http://$suburl/clmi.yaml"
-echo "Sing-box本地IP订阅地址：http://$suburl/sbox.json"
-echo "聚合协议本地IP订阅地址：http://$suburl/jhsub.txt"
 echo "**********************************************************"
 fi
 fi
@@ -3260,8 +3258,7 @@ web_token=$(cat "$HOME/agsbx/subtoken.log" 2>/dev/null)
 mkdir -p "$HOME/websbx/$web_token"
 chmod 711 "$HOME/websbx" "$HOME/websbx/$web_token" 2>/dev/null || true
 ln -sf "$HOME/agsbx/clmi.yaml" "$HOME/websbx/$web_token/clmi.yaml"
-ln -sf "$HOME/agsbx/sbox.json" "$HOME/websbx/$web_token/sbox.json"
-ln -sf "$HOME/agsbx/jhsub.txt" "$HOME/websbx/$web_token/jhsub.txt"
+rm -f "$HOME/websbx/$web_token/sbox.json" "$HOME/websbx/$web_token/jhsub.txt"
 ln -sfn "$HOME/agsbx/qrcodes" "$HOME/websbx/$web_token/qrcodes"
 if command -v apk >/dev/null 2>&1; then
 busybox-extras httpd -f -p "$(cat $HOME/agsbx/subport.log 2>/dev/null)" -h $HOME/websbx > /dev/null 2>&1 &
