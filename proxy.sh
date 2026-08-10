@@ -1,5 +1,5 @@
 #!/bin/sh
-SCRIPT_VERSION=${SCRIPT_VERSION:-v1.0.0-20260620}
+SCRIPT_VERSION=${SCRIPT_VERSION:-v1.1.0-20260810}
 PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh}
 if [ -z "${PROXY_SELECTED_KEYS+x}" ]; then
 PROXY_SELECTED_KEYS=""
@@ -580,6 +580,8 @@ socks5_auth=$(cat "$HOME/agsbx/socks5_auth")
 }
 showqrcode(){
 qrtext="$1"
+qrname="$2"
+[ -z "$qrname" ] && qrname="node"
 if ! command -v qrencode >/dev/null 2>&1; then
 if command -v apt-get >/dev/null 2>&1; then
 prepare_apt_noninteractive
@@ -594,14 +596,27 @@ dnf install -y qrencode >/dev/null 2>&1
 fi
 fi
 if command -v qrencode >/dev/null 2>&1; then
+mkdir -p "$HOME/agsbx/qrcodes"
+qrfile="$HOME/agsbx/qrcodes/${qrname}.png"
 if command -v timeout >/dev/null 2>&1; then
-timeout 10 qrencode -t UTF8 -m 1 -l L "$qrtext" 2>/dev/null || timeout 10 qrencode -t ANSIUTF8 -m 1 -l L "$qrtext" 2>/dev/null || echo "二维码显示超时，请使用上方节点分享链接手动导入。"
+timeout 10 qrencode -t PNG -m 2 -s 6 -l L -o "$qrfile" "$qrtext" 2>/dev/null || echo "二维码图片生成失败，请使用上方节点分享链接手动导入。"
 else
-qrencode -t UTF8 -m 1 -l L "$qrtext" 2>/dev/null || qrencode -t ANSIUTF8 -m 1 -l L "$qrtext" 2>/dev/null || echo "二维码显示失败，请使用上方节点分享链接手动导入。"
+qrencode -t PNG -m 2 -s 6 -l L -o "$qrfile" "$qrtext" 2>/dev/null || echo "二维码图片生成失败，请使用上方节点分享链接手动导入。"
 fi
+[ -s "$qrfile" ] && echo "$qrfile"
 else
-echo "qrencode is not installed, QR code cannot be shown in terminal."
+echo "qrencode 未安装，无法生成二维码图片。"
 fi
+}
+qr_web_url(){
+qrname="$1"
+showsubport=$(cat "$HOME/agsbx/subport.log" 2>/dev/null)
+showsubtoken=$(cat "$HOME/agsbx/subtoken.log" 2>/dev/null)
+subip=$(cat "$HOME/agsbx/server_ip.log" 2>/dev/null)
+[ -n "$showsubport" ] || return 1
+[ -n "$showsubtoken" ] || return 1
+[ -n "$subip" ] || return 1
+echo "http://$subip:$showsubport/$showsubtoken/qrcodes/${qrname}.png"
 }
 print_section(){
 printf '\n\033[1;36m%s\033[0m\n' "============================================================"
@@ -611,12 +626,86 @@ printf '\033[1;36m%s\033[0m\n' "================================================
 print_link(){
 plink_title="$1"
 plink_url="$2"
+plink_name="$3"
 [ -z "$plink_url" ] && return
+[ -z "$plink_name" ] && plink_name=$(printf '%s' "$plink_url" | sha256sum | awk '{print substr($1,1,16)}')
 printf '\033[1;33m%s\033[0m\n' "$plink_title"
 printf '\033[0;32m%s\033[0m\n' "$plink_url"
-printf '\033[1;33m%s\033[0m\n' "二维码："
-showqrcode "$plink_url"
+qr_path=$(showqrcode "$plink_url" "$plink_name" | tail -n 1)
+if [ -n "$qr_path" ] && [ -s "$qr_path" ]; then
+qr_url=$(qr_web_url "$plink_name" 2>/dev/null || true)
+if [ -n "$qr_url" ]; then
+printf '\033[1;33m%s\033[0m\n' "二维码图片网页地址："
+printf '\033[0;32m%s\033[0m\n' "$qr_url"
+printf '\033[1;36m%s\033[0m\n' "请用网页浏览器打开该地址，然后扫码导入。"
+else
+printf '\033[1;33m%s\033[0m\n' "二维码图片网页地址：订阅服务开启后会在下方汇总显示。"
+fi
+fi
 echo
+}
+reality_candidates(){
+cat <<EOF
+www.microsoft.com
+www.apple.com
+xp.apple.com
+www.icloud.com
+aws.amazon.com
+www.amazon.com
+www.cloudflare.com
+www.intel.com
+www.nvidia.com
+www.amd.com
+www.sony.com
+www.samsung.com
+www.oracle.com
+www.tesla.com
+addons.mozilla.org
+www.bing.com
+go.microsoft.com
+azure.microsoft.com
+www.xbox.com
+www.lovelive-anime.jp
+EOF
+}
+reality_target_ms(){
+rt_domain="$1"
+rt_start=$(date +%s%3N 2>/dev/null || date +%s)
+if command -v timeout >/dev/null 2>&1; then
+rt_out=$(timeout 4 openssl s_client -connect "$rt_domain:443" -servername "$rt_domain" -tls1_3 -alpn h2 </dev/null 2>&1)
+else
+rt_out=$(openssl s_client -connect "$rt_domain:443" -servername "$rt_domain" -tls1_3 -alpn h2 </dev/null 2>&1)
+fi
+rt_rc=$?
+rt_end=$(date +%s%3N 2>/dev/null || date +%s)
+[ "$rt_rc" = 0 ] || return 1
+echo "$rt_out" | grep -qi 'ALPN protocol: h2' || return 1
+echo "$rt_out" | grep -qi 'TLSv1.3' || return 1
+rt_ms=$((rt_end - rt_start))
+[ "$rt_ms" -ge 0 ] 2>/dev/null || return 1
+echo "$rt_ms"
+}
+select_reality_domain(){
+best_domain=""
+best_ms=""
+echo "正在检测 Reality 候选域名，请稍等..." >&2
+for rt_domain in $(reality_candidates); do
+rt_ms=$(reality_target_ms "$rt_domain" 2>/dev/null || true)
+if [ -n "$rt_ms" ]; then
+echo "  可用: $rt_domain ${rt_ms}ms" >&2
+if [ -z "$best_ms" ] || [ "$rt_ms" -lt "$best_ms" ] 2>/dev/null; then
+best_domain="$rt_domain"
+best_ms="$rt_ms"
+fi
+fi
+done
+if [ -n "$best_domain" ]; then
+echo "Reality优选域名：$best_domain (${best_ms}ms)" >&2
+echo "$best_domain"
+else
+echo "Reality候选域名检测失败，使用默认域名 www.microsoft.com" >&2
+echo "www.microsoft.com"
+fi
 }
 installxray(){
 echo
@@ -635,7 +724,7 @@ EOF
 insuuid
 if [ -n "$xhp" ] || [ -n "$vlp" ]; then
 if [ -z "$ym_vl_re" ]; then
-ym_vl_re=xp.apple.com
+ym_vl_re=$(select_reality_domain)
 fi
 echo "$ym_vl_re" > "$HOME/agsbx/ym_vl_re"
 echo "Reality域名：$ym_vl_re"
@@ -991,7 +1080,7 @@ fi
 if [ -n "$arp" ]; then
 arp=arpt
 if [ -z "$ym_vl_re" ]; then
-ym_vl_re=xp.apple.com
+ym_vl_re=$(select_reality_domain)
 fi
 echo "$ym_vl_re" > "$HOME/agsbx/ym_vl_re"
 echo "Reality域名：$ym_vl_re"
@@ -1704,20 +1793,20 @@ print_section "Vless XHTTP Reality ENC"
 port_xh=$(cat "$HOME/agsbx/port_xh")
 vl_xh_link="vless://$uuid@$server_ip:$port_xh?encryption=$enkey&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=xhttp&path=$uuid-xh&mode=auto#$hostname"
 echo "$vl_xh_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$vl_xh_link"
+print_link "节点分享链接：" "$vl_xh_link" "vless-xhttp-reality"
 fi
 if grep vless-xhttp "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
 print_section "Vless XHTTP ENC"
 port_vx=$(cat "$HOME/agsbx/port_vx")
 vl_vx_link="vless://$uuid@$server_ip:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&path=$uuid-vx&mode=auto#$hostname"
 echo "$vl_vx_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$vl_vx_link"
+print_link "节点分享链接：" "$vl_vx_link" "vless-xhttp"
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vless XHTTP ENC CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
 vl_vx_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&host=$xvvmcdnym&path=$uuid-vx&mode=auto#$hostname"
 echo "$vl_vx_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$vl_vx_cdn_link"
+print_link "节点分享链接：" "$vl_vx_cdn_link" "vless-xhttp-cdn"
 fi
 fi
 if grep vless-ws "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
@@ -1725,13 +1814,13 @@ print_section "Vless WS ENC"
 port_vw=$(cat "$HOME/agsbx/port_vw")
 vl_vw_link="vless://$uuid@$server_ip:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&path=$uuid-vw#$hostname"
 echo "$vl_vw_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$vl_vw_link"
+print_link "节点分享链接：" "$vl_vw_link" "vless-ws"
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vless WS ENC CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
 vl_vw_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$xvvmcdnym&path=$uuid-vw#$hostname"
 echo "$vl_vw_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$vl_vw_cdn_link"
+print_link "节点分享链接：" "$vl_vw_cdn_link" "vless-ws-cdn"
 fi
 fi
 if grep reality-vision "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
@@ -1739,7 +1828,7 @@ print_section "Vless TCP Reality Vision"
 port_vl_re=$(cat "$HOME/agsbx/port_vl_re")
 vl_link="vless://$uuid@$server_ip:$port_vl_re?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=tcp&headerType=none#$hostname"
 echo "$vl_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$vl_link"
+print_link "节点分享链接：" "$vl_link" "vless-reality"
 sbvlpt(){
 cat <<EOF
     {
@@ -1796,7 +1885,7 @@ port_ss=$(cat "$HOME/agsbx/port_ss")
 ss_userinfo=$(printf '%s' "aes-256-gcm:$sskey" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')
 ss_link="ss://${ss_userinfo}@${server_ip}:${port_ss}#$hostname"
 echo "$ss_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$ss_link"
+print_link "节点分享链接：" "$ss_link" "shadowsocks"
 sbsspt(){
 cat <<EOF
 {
@@ -1838,7 +1927,7 @@ print_section "Vmess WS"
 port_vm_ws=$(cat "$HOME/agsbx/port_vm_ws")
 vm_link="vmess://$(echo "{ "v": "2", "ps": "$hostname", "add": "$server_ip", "port": "$port_vm_ws", "id": "$uuid", "aid": "0", "scy": "auto", "net": "ws", "type": "none", "host": "www.bing.com", "path": "/$uuid-vm", "tls": ""}" | base64 -w0)"
 echo "$vm_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$vm_link"
+print_link "节点分享链接：" "$vm_link" "vmess-ws"
 sbvmpt(){
 cat <<EOF
 {
@@ -1900,7 +1989,7 @@ print_section "Vmess WS CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
 vm_cdn_link="vmess://$(echo "{ "v": "2", "ps": "$hostname", "add": "cdn$(cfipsj).YOUR_CDN_DOMAIN", "port": "$port_vm_ws", "id": "$uuid", "aid": "0", "scy": "auto", "net": "ws", "type": "none", "host": "$xvvmcdnym", "path": "/$uuid-vm", "tls": ""}" | base64 -w0)"
 echo "$vm_cdn_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$vm_cdn_link"
+print_link "节点分享链接：" "$vm_cdn_link" "vmess-ws-cdn"
 fi
 fi
 if grep anytls-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
@@ -1908,7 +1997,7 @@ print_section "AnyTLS"
 port_an=$(cat "$HOME/agsbx/port_an")
 an_link="anytls://$uuid@$server_ip:$port_an?insecure=1&allowInsecure=1#$hostname"
 echo "$an_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$an_link"
+print_link "节点分享链接：" "$an_link" "anytls"
 sbanpt(){
 cat <<EOF
          {
@@ -1955,7 +2044,7 @@ print_section "AnyTLS Reality"
 port_ar=$(cat "$HOME/agsbx/port_ar")
 ar_link="anytls://$uuid@$server_ip:$port_ar?security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_s&sid=$short_id_s&type=tcp&headerType=none#$hostname"
 echo "$ar_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$ar_link"
+print_link "节点分享链接：" "$ar_link" "anytls-reality"
 sbarpt(){
 cat <<EOF
     {
@@ -2005,10 +2094,9 @@ EOF
 else
 hyps=
 fi
-#hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1&allowInsecure=1$hyps&sni=www.bing.com#$hostname"
-hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=0&allowInsecure=0$hyps&sni=www.bing.com&pinSHA256=$SHA256#$hostname"
+hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1&allowInsecure=1$hyps&sni=www.bing.com#$hostname"
 echo "$hy2_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$hy2_link"
+print_link "节点分享链接：" "$hy2_link" "hysteria2"
 sbhypt(){
 cat <<EOF
     {
@@ -2056,7 +2144,7 @@ print_section "Tuic"
 port_tu=$(cat "$HOME/agsbx/port_tu")
 tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&insecure=1&allowInsecure=1&allow_insecure=1#$hostname"
 echo "$tuic5_link" >> "$HOME/agsbx/jhsub.txt"
-print_link "节点分享链接：" "$tuic5_link"
+print_link "节点分享链接：" "$tuic5_link" "tuic5"
 sbtupt(){
 cat <<EOF
         {
@@ -2120,7 +2208,9 @@ printf '\033[1;37m%s\033[0m\n' "------------------------------------------------
 printf '\033[1;36m%s\033[0m' "指纹浏览器格式："
 printf '\033[1;32m%s\033[0m\n' "${server_ip}:${port_so}:${socks5_auth}:${socks5_auth}"
 echo "温馨提示：socks5使用一般需要海外环境。"
-print_link "节点分享链接：" "$socks5_link"
+printf '\033[1;33m%s\033[0m\n' "节点分享链接："
+printf '\033[0;32m%s\033[0m\n' "$socks5_link"
+printf '\033[1;33m%s\033[0m\n' "Socks5不生成二维码，请使用上方账号信息或指纹浏览器格式。"
 fi
 argodomain=$(cat "$HOME/agsbx/sbargoym.log" 2>/dev/null)
 [ -z "$argodomain" ] && argodomain=$(grep -a trycloudflare.com "$HOME/agsbx/argo.log" 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
@@ -2538,10 +2628,10 @@ rules:
 EOF
 echo "---------------------------------------------------------"
 echo "$argoshow"
-[ -n "$vmatls_link1" ] && print_link "Argo TLS 443 节点分享链接：" "$vmatls_link1"
-[ -n "$vwatls_link1" ] && print_link "Argo TLS 443 节点分享链接：" "$vwatls_link1"
-[ -n "$vma_link7" ] && print_link "Argo 80 节点分享链接：" "$vma_link7"
-[ -n "$vwa_link2" ] && print_link "Argo 80 节点分享链接：" "$vwa_link2"
+[ -n "$vmatls_link1" ] && print_link "Argo TLS 443 节点分享链接：" "$vmatls_link1" "argo-vmess-tls"
+[ -n "$vwatls_link1" ] && print_link "Argo TLS 443 节点分享链接：" "$vwatls_link1" "argo-vless-tls"
+[ -n "$vma_link7" ] && print_link "Argo 80 节点分享链接：" "$vma_link7" "argo-vmess"
+[ -n "$vwa_link2" ] && print_link "Argo 80 节点分享链接：" "$vwa_link2" "argo-vless"
 echo
 if [ -s $HOME/agsbx/subport.log ]; then
 showsubport=$(cat $HOME/agsbx/subport.log)
@@ -2553,13 +2643,19 @@ echo "**********************************************************"
 echo "Clash/Mihomo本地IP订阅地址：http://$suburl/clmi.yaml"
 echo "Sing-box本地IP订阅地址：http://$suburl/sbox.json"
 echo "聚合协议本地IP订阅地址：http://$suburl/jhsub.txt"
+echo "二维码图片目录：http://$suburl/qrcodes/"
+echo "提示：请用网页浏览器打开二维码图片地址，然后扫码导入。"
+for qrpng in "$HOME"/agsbx/qrcodes/*.png; do
+[ -f "$qrpng" ] || continue
+echo "二维码图片：$(basename "$qrpng" .png)  http://$suburl/qrcodes/$(basename "$qrpng")"
+done
 echo "**********************************************************"
 fi
 fi
 echo
 echo "---------------------------------------------------------"
 printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
-printf '\033[1;31m%s\033[0m\n' "向上翻看节点分享链接和二维码"
+printf '\033[1;31m%s\033[0m\n' "向上翻看节点分享链接和二维码图片网页地址"
 printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
 echo "聚合节点文件：$HOME/agsbx/jhsub.txt"
 echo "查看节点命令：cat $HOME/agsbx/jhsub.txt"
@@ -2729,6 +2825,7 @@ mkdir -p $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"
 ln -sf $HOME/agsbx/clmi.yaml $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"/clmi.yaml
 ln -sf $HOME/agsbx/sbox.json $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"/sbox.json
 ln -sf $HOME/agsbx/jhsub.txt $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"/jhsub.txt
+ln -sfn $HOME/agsbx/qrcodes $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"/qrcodes
 if command -v apk >/dev/null 2>&1; then
 busybox-extras httpd -f -p "$(cat $HOME/agsbx/subport.log 2>/dev/null)" -h $HOME/websbx > /dev/null 2>&1 &
 else

@@ -44,7 +44,7 @@ vmpt="" vwpt="" sopt="" sspt="" bash <(curl -Ls https://raw.githubusercontent.co
 | Vless WS ENC | `vwpt` | 留空随机端口，支持 Argo/CDN |
 | Vmess WS | `vmpt` | 留空随机端口，支持 Argo/CDN |
 | Shadowsocks | `sspt` | 留空随机端口 |
-| Socks5 | `sopt` | 留空随机端口，会输出分享链接和二维码 |
+| Socks5 | `sopt` | 留空随机端口，输出账号信息、分享链接和指纹浏览器格式，不生成二维码 |
 | Hysteria2 | `hypt` | 留空随机端口 |
 | Tuic | `tupt` | 留空随机端口 |
 | AnyTLS | `anpt` | 留空随机端口 |
@@ -62,3 +62,11 @@ proxy upx    # 更新 Xray 内核
 proxy ups    # 更新 Sing-box 内核
 proxy del    # 卸载
 ```
+
+## 输出说明
+
+- 终端会直接显示节点分享链接。
+- Vless、Vmess、Shadowsocks、Hysteria2、Tuic、AnyTLS、Any Reality 会生成二维码图片网页地址，用户可打开网页扫码。
+- Socks5 不生成二维码，只显示客户端 IP、端口号、用户名、密码、分享链接和指纹浏览器格式。
+- Reality 域名留空时，脚本会自动从候选域名里测速选择延迟最低的目标，候选列表包含 `xp.apple.com`。
+- Hysteria2 使用自签证书时，分享链接和 Clash 配置已默认开启跳过证书校验，避免部分客户端导入后证书验证失败。
