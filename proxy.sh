@@ -42,6 +42,21 @@ progress_percent="$1"
 shift
 printf '\033[1;36m[%3s%%]\033[0m %s\n' "$progress_percent" "$*"
 }
+repair_dns_if_needed(){
+[ "$1" = "del" ] && return
+if getent hosts api.github.com >/dev/null 2>&1 && getent hosts raw.githubusercontent.com >/dev/null 2>&1; then
+return 0
+fi
+if ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 || ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
+show_progress 39 "修复 DNS 解析配置"
+dns_iface=$(ip route 2>/dev/null | awk '/^default /{print $5; exit}')
+if [ -n "$dns_iface" ] && command -v resolvectl >/dev/null 2>&1; then
+resolvectl dns "$dns_iface" 1.1.1.1 8.8.8.8 >/dev/null 2>&1 || true
+resolvectl default-route "$dns_iface" true >/dev/null 2>&1 || true
+fi
+printf 'options timeout:2 attempts:2 rotate\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf 2>/dev/null || true
+fi
+}
 prepare_apt_noninteractive(){
 if command -v systemctl >/dev/null 2>&1; then
 systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service >/dev/null 2>&1 || true
@@ -275,6 +290,7 @@ show_progress 35 "检查并关闭系统防火墙"
 disable_system_firewall "$1"
 show_progress 38 "应用网络参数和BBR优化"
 enable_network_tuning "$1"
+repair_dns_if_needed "$1"
 case " $PROXY_SELECTED_KEYS " in *" vlpt "*) vlp=yes ;; esac
 case " $PROXY_SELECTED_KEYS " in *" vmpt "*) vmp=yes; vmag=yes ;; esac
 case " $PROXY_SELECTED_KEYS " in *" vwpt "*) vwp=yes; vmag=yes ;; esac
@@ -2669,7 +2685,7 @@ if ! find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -
 for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsbx/c|/agsbx/s|/agsbx/x'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null && echo "Killed $PID ($TARGET)" || echo "Could not kill $PID ($TARGET)"; fi; fi; done
 kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) $(pgrep -f 'agsbx/c' 2>/dev/null) $(pgrep -f 'agsbx/x' 2>/dev/null) >/dev/null 2>&1
 if [ -z "$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k "$v46url" 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -4 -qO- --tries=2 "$v46url" 2>/dev/null) )" ]; then
-echo -e "nameserver 2a00:1098:2b::1\nnameserver 2a00:1098:2c::1" > /etc/resolv.conf
+printf 'options timeout:2 attempts:2 rotate\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf
 fi
 if [ -n "$( (command -v curl >/dev/null 2>&1 && curl -s6m5 -k "$v46url" 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 -qO- --tries=2 "$v46url" 2>/dev/null) )" ]; then
 sendip="2606:4700:d0::a29f:c001"
