@@ -2768,6 +2768,135 @@ allow-lan: true
 mode: rule
 log-level: info
 unified-delay: true
+geodata-mode: true
+geo-auto-update: true
+geodata-loader: standard
+geo-update-interval: 24
+geox-url:
+  geoip: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat
+  geosite: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat
+  mmdb: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb
+  asn: https://github.com/xishang0128/geoip/releases/download/latest/GeoLite2-ASN.mmdb
+rule-providers:
+  category-ai-!cn:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/category-ai-!cn.mrs
+    path: ./ruleset/category-ai-!cn.mrs
+    interval: 86400
+  youtube:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/youtube.mrs
+    path: ./ruleset/youtube.mrs
+    interval: 86400
+  google:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/google.mrs
+    path: ./ruleset/google.mrs
+    interval: 86400
+  github:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/github.mrs
+    path: ./ruleset/github.mrs
+    interval: 86400
+  gitlab:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/gitlab.mrs
+    path: ./ruleset/gitlab.mrs
+    interval: 86400
+  facebook:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/facebook.mrs
+    path: ./ruleset/facebook.mrs
+    interval: 86400
+  instagram:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/instagram.mrs
+    path: ./ruleset/instagram.mrs
+    interval: 86400
+  twitter:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/twitter.mrs
+    path: ./ruleset/twitter.mrs
+    interval: 86400
+  tiktok:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/tiktok.mrs
+    path: ./ruleset/tiktok.mrs
+    interval: 86400
+  linkedin:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/linkedin.mrs
+    path: ./ruleset/linkedin.mrs
+    interval: 86400
+  geolocation-cn:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/geolocation-cn.mrs
+    path: ./ruleset/geolocation-cn.mrs
+    interval: 86400
+  cn:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/cn.mrs
+    path: ./ruleset/cn.mrs
+    interval: 86400
+  geolocation-!cn:
+    type: http
+    format: mrs
+    behavior: domain
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/geolocation-!cn.mrs
+    path: ./ruleset/geolocation-!cn.mrs
+    interval: 86400
+  private-ip:
+    type: http
+    format: mrs
+    behavior: ipcidr
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/private.mrs
+    path: ./ruleset/private-ip.mrs
+    interval: 86400
+  cn-ip:
+    type: http
+    format: mrs
+    behavior: ipcidr
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/cn.mrs
+    path: ./ruleset/cn-ip.mrs
+    interval: 86400
+  google-ip:
+    type: http
+    format: mrs
+    behavior: ipcidr
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/google.mrs
+    path: ./ruleset/google-ip.mrs
+    interval: 86400
+  telegram-ip:
+    type: http
+    format: mrs
+    behavior: ipcidr
+    url: https://gh-proxy.com/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/telegram.mrs
+    path: ./ruleset/telegram-ip.mrs
+    interval: 86400
 dns:
   enable: true 
   listen: "0.0.0.0:1053"
@@ -2791,43 +2920,128 @@ dns:
     - "time.*.gov"
     - "pool.ntp.org"
     - "localhost.work.weixin.qq.com"
-  default-nameserver: ["223.5.5.5", "119.29.29.29"]
   nameserver:
-    - "https://1.1.1.1/dns-query"
-    - "https://8.8.8.8/dns-query"
-  proxy-server-nameserver:
+    - "https://120.53.53.53/dns-query"
     - "https://223.5.5.5/dns-query"
-    - "https://doh.pub/dns-query"
+  proxy-server-nameserver:
+    - "https://120.53.53.53/dns-query"
+    - "https://223.5.5.5/dns-query"
+  nameserver-policy:
+    geosite:cn,private:
+      - "https://120.53.53.53/dns-query"
+      - "https://223.5.5.5/dns-query"
+    geosite:geolocation-!cn:
+      - "https://dns.cloudflare.com/dns-query"
+      - "https://dns.google/dns-query"
 
 proxies:
 $clxy
 
 proxy-groups:
-- name: 负载均衡
-  type: load-balance
-  url: https://www.gstatic.com/generate_204
-  interval: 300
-  strategy: round-robin
+- name: 🚀 节点选择
+  type: select
   proxies:
+    - ⚡ 自动选择
     $clgz
-- name: 自动选择
+    - DIRECT
+    - REJECT
+- name: ⚡ 自动选择
   type: url-test
   url: https://www.gstatic.com/generate_204
   interval: 300
+  lazy: false
   tolerance: 50
   proxies:
     $clgz 
-- name: 🌍选择代理节点
+- name: 💬 AI 服务
   type: select
   proxies:
-    - 负载均衡                                         
-    - 自动选择
-    - DIRECT
+    - 🚀 节点选择
     $clgz
+    - DIRECT
+    - REJECT
+- name: 📹 油管视频
+  type: select
+  proxies:
+    - 🚀 节点选择
+    $clgz
+    - DIRECT
+    - REJECT
+- name: 🔍 谷歌服务
+  type: select
+  proxies:
+    - 🚀 节点选择
+    $clgz
+    - DIRECT
+    - REJECT
+- name: 🐱 Github
+  type: select
+  proxies:
+    - 🚀 节点选择
+    $clgz
+    - DIRECT
+    - REJECT
+- name: 🌐 社交媒体
+  type: select
+  proxies:
+    - 🚀 节点选择
+    $clgz
+    - DIRECT
+    - REJECT
+- name: 📲 电报消息
+  type: select
+  proxies:
+    - 🚀 节点选择
+    $clgz
+    - DIRECT
+    - REJECT
+- name: 🏠 私有网络
+  type: select
+  proxies:
+    - DIRECT
+    - 🚀 节点选择
+    $clgz
+    - REJECT
+- name: 🔒 国内服务
+  type: select
+  proxies:
+    - DIRECT
+    - 🚀 节点选择
+    $clgz
+    - REJECT
+- name: 🌐 非中国
+  type: select
+  proxies:
+    - 🚀 节点选择
+    $clgz
+    - DIRECT
+    - REJECT
+- name: 🐟 漏网之鱼
+  type: select
+  proxies:
+    - 🚀 节点选择
+    $clgz
+    - DIRECT
+    - REJECT
 rules:
-  - GEOIP,LAN,DIRECT
-  - GEOIP,CN,DIRECT
-  - MATCH,🌍选择代理节点
+  - RULE-SET,category-ai-!cn,💬 AI 服务
+  - RULE-SET,youtube,📹 油管视频
+  - RULE-SET,google,🔍 谷歌服务
+  - RULE-SET,github,🐱 Github
+  - RULE-SET,gitlab,🐱 Github
+  - RULE-SET,facebook,🌐 社交媒体
+  - RULE-SET,instagram,🌐 社交媒体
+  - RULE-SET,twitter,🌐 社交媒体
+  - RULE-SET,tiktok,🌐 社交媒体
+  - RULE-SET,linkedin,🌐 社交媒体
+  - RULE-SET,telegram-ip,📲 电报消息,no-resolve
+  - RULE-SET,private-ip,🏠 私有网络,no-resolve
+  - RULE-SET,geolocation-cn,🔒 国内服务
+  - RULE-SET,cn,🔒 国内服务
+  - RULE-SET,cn-ip,🔒 国内服务,no-resolve
+  - RULE-SET,geolocation-!cn,🌐 非中国
+  - RULE-SET,google-ip,🔍 谷歌服务,no-resolve
+  - MATCH,🐟 漏网之鱼
 EOF
 echo "---------------------------------------------------------"
 echo "$argoshow"
