@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>节点信息汇总</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0b1020;
+      color: #eef3ff;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+    }
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 26px 18px 34px;
+    }
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 18px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid #243153;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin: 0;
+      color: #a9b8d6;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .status {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .pill {
+      border: 1px solid #345083;
+      background: #101936;
+      color: #93c5fd;
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(292px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #121a33;
+      border: 1px solid #26345f;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, .24);
+    }
+    .socks-card {
+      grid-column: 1 / -1;
+    }
+    .card-head {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .protocol-pill {
+      color: #c4b5fd;
+      background: #1d1739;
+      border: 1px solid #4c3b82;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .qr-area {
+      min-height: 246px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0c1328;
+      border: 1px solid #23325e;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      padding: 12px;
+    }
+    .qr {
+      width: 218px;
+      height: 218px;
+      background:
+        linear-gradient(90deg, #111 10px, transparent 10px) 0 0 / 22px 22px,
+        linear-gradient(#111 10px, transparent 10px) 0 0 / 22px 22px,
+        #fff;
+      border: 8px solid #fff;
+      border-radius: 6px;
+    }
+    .noqr {
+      width: 218px;
+      min-height: 132px;
+      border: 1px dashed #4b6596;
+      border-radius: 8px;
+      color: #facc15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      line-height: 1.7;
+      padding: 14px;
+    }
+    .socks-layout {
+      display: grid;
+      gap: 10px;
+    }
+    .socks-note {
+      color: #facc15;
+      font-size: 13px;
+      margin: -2px 0 4px;
+    }
+    .label {
+      color: #facc15;
+      font-size: 12px;
+      margin: 0 0 6px;
+    }
+    .copy-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .copy-btn {
+      border: 1px solid #2f477b;
+      background: #17244a;
+      color: #dbeafe;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .copy-btn:hover {
+      background: #21366c;
+    }
+    .copy-btn.done {
+      border-color: #22c55e;
+      color: #86efac;
+      background: #12351f;
+    }
+    textarea {
+      width: 100%;
+      min-height: 118px;
+      resize: vertical;
+      border: 1px solid #2d3b68;
+      border-radius: 8px;
+      background: #0c1328;
+      color: #86efac;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.5;
+      outline: none;
+    }
+    .info-list {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 4px;
+      color: #dbeafe;
+      font-size: 13px;
+    }
+    .info-list div {
+      border: 1px solid #263b6c;
+      background: #0c1328;
+      border-radius: 7px;
+      padding: 9px 10px;
+    }
+    .info-list span {
+      display: block;
+      color: #94a3b8;
+      margin-bottom: 5px;
+    }
+    .info-list strong {
+      display: block;
+      color: #86efac;
+      font-weight: 600;
+      word-break: break-all;
+      text-align: left;
+    }
+    @media (max-width: 720px) {
+      .topbar { display: block; }
+      .status { justify-content: flex-start; margin-top: 12px; }
+      .info-list { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="topbar">
+      <div>
+        <h1>节点信息汇总</h1>
+        <p class="subtitle">请使用网页浏览器打开本页。支持扫码的协议可直接扫码导入；Socks5 请复制指纹浏览器格式或账号信息。</p>
+      </div>
+      <div class="status">
+        <span class="pill">服务器：德国-82.139.205.12</span>
+        <span class="pill">一键节点脚本生成</span>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <div class="card-head">
+          <div class="protocol-pill">vless-reality</div>
+        </div>
+        <div class="qr-area"><div class="qr"></div></div>
+        <div class="copy-row">
+          <p class="label">节点分享链接</p>
+          <button class="copy-btn" type="button" data-copy="vless-link">复制</button>
+        </div>
+        <textarea id="vless-link" readonly>vless://uuid@82.139.205.12:21087?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.microsoft.com&fp=chrome&pbk=publickey&sid=abcd&type=tcp#德国-82.139.205.12</textarea>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="protocol-pill">hysteria2</div>
+        </div>
+        <div class="qr-area"><div class="qr"></div></div>
+        <div class="copy-row">
+          <p class="label">节点分享链接</p>
+          <button class="copy-btn" type="button" data-copy="hy2-link">复制</button>
+        </div>
+        <textarea id="hy2-link" readonly>hysteria2://uuid@82.139.205.12:44321?security=tls&alpn=h3&insecure=1&allowInsecure=1&sni=www.bing.com#德国-82.139.205.12</textarea>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="protocol-pill">shadowsocks</div>
+        </div>
+        <div class="qr-area"><div class="qr"></div></div>
+        <div class="copy-row">
+          <p class="label">节点分享链接</p>
+          <button class="copy-btn" type="button" data-copy="ss-link">复制</button>
+        </div>
+        <textarea id="ss-link" readonly>ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ@82.139.205.12:22362#德国-82.139.205.12</textarea>
+      </article>
+
+      <article class="card socks-card">
+        <div class="card-head">
+          <div class="protocol-pill">socks5</div>
+        </div>
+        <div class="socks-layout">
+          <p class="socks-note">Socks5 不生成二维码，适合指纹浏览器或代理软件手动填写。</p>
+          <div class="info-list">
+            <div><span>客户端IP</span><strong>82.139.205.12</strong></div>
+            <div><span>端口号</span><strong>33197</strong></div>
+            <div><span>用户名</span><strong>jz1Q203Xok1H</strong></div>
+            <div><span>密码</span><strong>jz1Q203Xok1H</strong></div>
+          </div>
+          <div class="copy-row">
+            <p class="label">指纹浏览器格式</p>
+            <button class="copy-btn" type="button" data-copy="socks-format">复制</button>
+          </div>
+          <textarea id="socks-format" readonly>82.139.205.12:33197:jz1Q203Xok1H:jz1Q203Xok1H</textarea>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script>
+    document.querySelectorAll("[data-copy]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const target = document.getElementById(button.dataset.copy);
+        if (!target) return;
+        try {
+          await navigator.clipboard.writeText(target.value);
+        } catch (error) {
+          target.select();
+          document.execCommand("copy");
+        }
+        button.textContent = "已复制";
+        button.classList.add("done");
+        setTimeout(() => {
+          button.textContent = "复制";
+          button.classList.remove("done");
+        }, 1600);
+      });
+    });
+  </script>
+</body>
+</html>

@@ -120,7 +120,7 @@ fi
 printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections 2>/dev/null
 show_progress 15 "安装基础依赖包"
 apt_run 300 install -y --no-install-recommends --no-upgrade curl wget ca-certificates bash coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus >/dev/null 2>&1
-show_progress 22 "检查二维码和订阅服务组件"
+show_progress 22 "检查节点汇总页和订阅服务组件"
 command -v busybox >/dev/null 2>&1 || apt_run 180 install -y --no-install-recommends --no-upgrade busybox-static >/dev/null 2>&1 || true
 command -v qrencode >/dev/null 2>&1 || apt_run 180 install -y --no-install-recommends --no-upgrade qrencode >/dev/null 2>&1 || true
 elif command -v apk >/dev/null 2>&1; then
@@ -578,6 +578,17 @@ echo "$socks5_auth" > "$HOME/agsbx/socks5_auth"
 fi
 socks5_auth=$(cat "$HOME/agsbx/socks5_auth")
 }
+random_url_token(){
+token=$(tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 32)
+if [ ${#token} -lt 32 ]; then
+if command -v openssl >/dev/null 2>&1; then
+token=$(openssl rand -hex 24 2>/dev/null)
+else
+token=$(date +%s%N | sha256sum | awk '{print $1}')
+fi
+fi
+printf '%s\n' "$token"
+}
 showqrcode(){
 qrtext="$1"
 qrname="$2"
@@ -597,16 +608,183 @@ fi
 fi
 if command -v qrencode >/dev/null 2>&1; then
 mkdir -p "$HOME/agsbx/qrcodes"
+chmod 700 "$HOME/agsbx" "$HOME/agsbx/qrcodes" 2>/dev/null || true
 qrfile="$HOME/agsbx/qrcodes/${qrname}.png"
+printf '%s\n' "$qrtext" > "$HOME/agsbx/qrcodes/${qrname}.txt"
+chmod 600 "$HOME/agsbx/qrcodes/${qrname}.txt" 2>/dev/null || true
 if command -v timeout >/dev/null 2>&1; then
-timeout 10 qrencode -t PNG -m 2 -s 6 -l L -o "$qrfile" "$qrtext" 2>/dev/null || echo "二维码图片生成失败，请使用上方节点分享链接手动导入。"
+timeout 10 qrencode -t PNG -m 2 -s 6 -l L -o "$qrfile" "$qrtext" 2>/dev/null || echo "节点信息汇总页图片生成失败，请使用上方节点分享链接手动导入。"
 else
-qrencode -t PNG -m 2 -s 6 -l L -o "$qrfile" "$qrtext" 2>/dev/null || echo "二维码图片生成失败，请使用上方节点分享链接手动导入。"
+qrencode -t PNG -m 2 -s 6 -l L -o "$qrfile" "$qrtext" 2>/dev/null || echo "节点信息汇总页图片生成失败，请使用上方节点分享链接手动导入。"
 fi
 [ -s "$qrfile" ] && echo "$qrfile"
 else
-echo "qrencode 未安装，无法生成二维码图片。"
+echo "qrencode 未安装，节点信息汇总页将只保留分享链接。"
 fi
+}
+html_escape(){
+printf '%s' "$1" | sed 's/\&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'
+}
+qr_display_name(){
+case "$1" in
+vless-xhttp-reality) echo "Vless XHTTP Reality" ;;
+vless-xhttp) echo "Vless XHTTP" ;;
+vless-xhttp-cdn) echo "Vless XHTTP CDN" ;;
+vless-ws) echo "Vless WS" ;;
+vless-ws-cdn) echo "Vless WS CDN" ;;
+vless-reality) echo "Vless TCP Reality Vision" ;;
+shadowsocks) echo "Shadowsocks" ;;
+vmess-ws) echo "Vmess WS" ;;
+vmess-ws-cdn) echo "Vmess WS CDN" ;;
+anytls) echo "AnyTLS" ;;
+anytls-reality) echo "AnyTLS Reality" ;;
+hysteria2) echo "Hysteria2" ;;
+tuic5) echo "Tuic5" ;;
+socks5) echo "Socks5" ;;
+argo-vmess-tls) echo "Argo Vmess TLS" ;;
+argo-vless-tls) echo "Argo Vless TLS" ;;
+argo-vmess) echo "Argo Vmess" ;;
+argo-vless) echo "Argo Vless" ;;
+*) echo "$1" ;;
+esac
+}
+generate_qr_index(){
+qrdir="$HOME/agsbx/qrcodes"
+indexfile="$qrdir/index.html"
+[ -d "$qrdir" ] || return
+cat > "$indexfile" <<'EOF'
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>节点信息汇总</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1020;color:#eef3ff;font-family:Arial,"Microsoft YaHei",sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:24px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:18px;border-bottom:1px solid #243153;padding-bottom:14px}
+h1{font-size:26px;margin:0 0 6px}
+.tip{color:#a9b8d6;margin:0;font-size:14px}
+.badge{border:1px solid #2f477b;color:#93c5fd;border-radius:999px;padding:6px 10px;font-size:13px;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:#121a33;border:1px solid #26345f;border-radius:8px;padding:14px;box-shadow:0 10px 26px rgba(0,0,0,.22)}
+.socks-card{grid-column:1/-1}
+.card-head{display:flex;justify-content:center;margin-bottom:12px}
+.protocol-pill{color:#c4b5fd;background:#1d1739;border:1px solid #4c3b82;border-radius:999px;padding:5px 10px;font-size:12px;line-height:1;white-space:nowrap}
+.qrbox{min-height:248px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+img{width:220px;height:220px;object-fit:contain;background:#fff;padding:8px;border-radius:6px;display:block}
+.noqr{width:220px;min-height:120px;border:1px dashed #36527f;border-radius:6px;color:#fbbf24;display:flex;align-items:center;justify-content:center;text-align:center;padding:14px;background:#0c1328}
+.socks-layout{display:grid;gap:10px}
+.socks-note{color:#facc15;font-size:13px;margin:-2px 0 4px}
+.info-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:4px;color:#dbeafe;font-size:13px}
+.info-list div{border:1px solid #263b6c;background:#0c1328;border-radius:7px;padding:9px 10px}
+.info-list span{display:block;color:#94a3b8;margin-bottom:5px}
+.info-list strong{display:block;color:#86efac;font-weight:600;word-break:break-all;text-align:left}
+.label{font-size:12px;color:#facc15;margin-bottom:6px}
+.copy-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.copy-btn{border:1px solid #2f477b;background:#17244a;color:#dbeafe;border-radius:6px;padding:7px 10px;font-size:12px;cursor:pointer}
+.copy-btn.done{border-color:#22c55e;color:#86efac;background:#12351f}
+textarea{width:100%;min-height:126px;resize:vertical;border:1px solid #2d3b68;border-radius:6px;background:#0c1328;color:#86efac;padding:10px;font-size:12px;line-height:1.45}
+@media(max-width:720px){.wrap{padding:16px}.head{display:block}.badge{display:inline-block;margin-top:10px}.info-list{grid-template-columns:1fr 1fr}img{width:200px;height:200px}.noqr{width:200px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="head">
+<div>
+<h1>节点信息汇总</h1>
+<p class="tip">请使用网页浏览器打开本页找回节点信息；支持扫码的协议会显示二维码。Socks5 不生成二维码。</p>
+</div>
+<div class="badge">一键节点脚本生成</div>
+</div>
+<div class="grid">
+EOF
+for qrtxt in "$qrdir"/*.txt; do
+[ -f "$qrtxt" ] || continue
+qrbase=$(basename "$qrtxt" .txt)
+qrpng="$qrdir/$qrbase.png"
+qrtxt="$qrdir/$qrbase.txt"
+qrlink=$(cat "$qrtxt" 2>/dev/null)
+escname=$(html_escape "$qrbase")
+display_name=$(qr_display_name "$qrbase")
+escdisplay=$(html_escape "$display_name")
+esclink=$(html_escape "$qrlink")
+if [ "$qrbase" = "socks5" ]; then
+SOCKS5_IP=$(html_escape "$(sed -n 's/^客户端IP：//p' "$qrtxt" | head -n 1)")
+SOCKS5_PORT=$(html_escape "$(sed -n 's/^端口号：//p' "$qrtxt" | head -n 1)")
+SOCKS5_USER=$(html_escape "$(sed -n 's/^用户名：//p' "$qrtxt" | head -n 1)")
+SOCKS5_PASS=$(html_escape "$(sed -n 's/^密码：//p' "$qrtxt" | head -n 1)")
+cat >> "$indexfile" <<EOF
+<div class="card socks-card">
+<div class="card-head"><div class="protocol-pill">$escname</div></div>
+<div class="socks-layout">
+<p class="socks-note">Socks5 不生成二维码，适合指纹浏览器或代理软件手动填写。</p>
+<div class="info-list">
+<div><span>客户端IP</span><strong>$SOCKS5_IP</strong></div>
+<div><span>端口号</span><strong>$SOCKS5_PORT</strong></div>
+<div><span>用户名</span><strong>$SOCKS5_USER</strong></div>
+<div><span>密码</span><strong>$SOCKS5_PASS</strong></div>
+</div>
+<div class="copy-row"><div class="label">Socks5 节点信息</div><button class="copy-btn" type="button" data-copy="node-$escname">复制</button></div>
+<textarea id="node-$escname" readonly>$esclink</textarea>
+</div>
+</div>
+EOF
+continue
+fi
+cat >> "$indexfile" <<EOF
+<div class="card">
+<div class="card-head"><div class="protocol-pill">$escname</div></div>
+<div class="qrbox">
+EOF
+if [ -f "$qrpng" ]; then
+cat >> "$indexfile" <<EOF
+<img src="$escname.png" alt="$escname">
+EOF
+else
+cat >> "$indexfile" <<'EOF'
+<div class="noqr">该协议不生成二维码<br>请使用下方节点信息</div>
+EOF
+fi
+cat >> "$indexfile" <<EOF
+</div>
+<div class="copy-row"><div class="label">节点分享链接</div><button class="copy-btn" type="button" data-copy="node-$escname">复制</button></div>
+<textarea id="node-$escname" readonly>$esclink</textarea>
+</div>
+EOF
+done
+cat >> "$indexfile" <<'EOF'
+</div>
+</div>
+<script>
+document.querySelectorAll("[data-copy]").forEach(function(button){
+  button.addEventListener("click", function(){
+    var target = document.getElementById(button.getAttribute("data-copy"));
+    if (!target) return;
+    var value = target.value;
+    function done(){
+      button.textContent = "已复制";
+      button.classList.add("done");
+      setTimeout(function(){button.textContent = "复制"; button.classList.remove("done");}, 1600);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value).then(done).catch(function(){
+        target.select();
+        document.execCommand("copy");
+        done();
+      });
+    } else {
+      target.select();
+      document.execCommand("copy");
+      done();
+    }
+  });
+});
+</script>
+</body>
+</html>
+EOF
 }
 qr_web_url(){
 qrname="$1"
@@ -617,6 +795,25 @@ subip=$(cat "$HOME/agsbx/server_ip.log" 2>/dev/null)
 [ -n "$showsubtoken" ] || return 1
 [ -n "$subip" ] || return 1
 echo "http://$subip:$showsubport/$showsubtoken/qrcodes/${qrname}.png"
+}
+qr_index_web_url(){
+showsubport=$(cat "$HOME/agsbx/subport.log" 2>/dev/null)
+showsubtoken=$(cat "$HOME/agsbx/subtoken.log" 2>/dev/null)
+subip=$(cat "$HOME/agsbx/server_ip.log" 2>/dev/null)
+[ -n "$showsubport" ] || return 1
+[ -n "$showsubtoken" ] || return 1
+[ -n "$subip" ] || return 1
+echo "http://$subip:$showsubport/$showsubtoken/qrcodes/index.html"
+}
+save_node_info(){
+node_name="$1"
+node_info="$2"
+[ -z "$node_name" ] && node_name="node"
+mkdir -p "$HOME/agsbx/qrcodes"
+printf '%s\n' "$node_info" > "$HOME/agsbx/qrcodes/${node_name}.txt"
+chmod 700 "$HOME/agsbx" "$HOME/agsbx/qrcodes" 2>/dev/null || true
+chmod 600 "$HOME/agsbx/qrcodes/${node_name}.txt" 2>/dev/null || true
+generate_qr_index
 }
 print_section(){
 printf '\n\033[1;36m%s\033[0m\n' "============================================================"
@@ -631,16 +828,10 @@ plink_name="$3"
 [ -z "$plink_name" ] && plink_name=$(printf '%s' "$plink_url" | sha256sum | awk '{print substr($1,1,16)}')
 printf '\033[1;33m%s\033[0m\n' "$plink_title"
 printf '\033[0;32m%s\033[0m\n' "$plink_url"
+save_node_info "$plink_name" "$plink_url"
 qr_path=$(showqrcode "$plink_url" "$plink_name" | tail -n 1)
 if [ -n "$qr_path" ] && [ -s "$qr_path" ]; then
-qr_url=$(qr_web_url "$plink_name" 2>/dev/null || true)
-if [ -n "$qr_url" ]; then
-printf '\033[1;33m%s\033[0m\n' "二维码图片网页地址："
-printf '\033[0;32m%s\033[0m\n' "$qr_url"
-printf '\033[1;36m%s\033[0m\n' "请用网页浏览器打开该地址，然后扫码导入。"
-else
-printf '\033[1;33m%s\033[0m\n' "二维码图片网页地址：订阅服务开启后会在下方汇总显示。"
-fi
+generate_qr_index
 fi
 echo
 }
@@ -2200,6 +2391,8 @@ port_so=$(cat "$HOME/agsbx/port_so")
 inssocks5auth
 socks5_link="socks://$(printf '%s' "${socks5_auth}:${socks5_auth}" | base64 | tr -d '\n=')@${server_ip}:${port_so}#$hostname"
 echo "$socks5_link" >> "$HOME/agsbx/jhsub.txt"
+socks5_info=$(printf '客户端IP：%s\n端口号：%s\n用户名：%s\n密码：%s\n指纹浏览器格式：%s\n节点分享链接：%s' "$server_ip" "$port_so" "$socks5_auth" "$socks5_auth" "${server_ip}:${port_so}:${socks5_auth}:${socks5_auth}" "$socks5_link")
+save_node_info "socks5" "$socks5_info"
 printf '\033[1;33m%s\033[0m\n' "客户端IP：$server_ip"
 printf '\033[1;33m%s\033[0m\n' "端口号：$port_so"
 printf '\033[1;33m%s\033[0m\n' "用户名：$socks5_auth"
@@ -2210,7 +2403,6 @@ printf '\033[1;32m%s\033[0m\n' "${server_ip}:${port_so}:${socks5_auth}:${socks5_
 echo "温馨提示：socks5使用一般需要海外环境。"
 printf '\033[1;33m%s\033[0m\n' "节点分享链接："
 printf '\033[0;32m%s\033[0m\n' "$socks5_link"
-printf '\033[1;33m%s\033[0m\n' "Socks5不生成二维码，请使用上方账号信息或指纹浏览器格式。"
 fi
 argodomain=$(cat "$HOME/agsbx/sbargoym.log" 2>/dev/null)
 [ -z "$argodomain" ] && argodomain=$(grep -a trycloudflare.com "$HOME/agsbx/argo.log" 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
@@ -2643,19 +2835,16 @@ echo "**********************************************************"
 echo "Clash/Mihomo本地IP订阅地址：http://$suburl/clmi.yaml"
 echo "Sing-box本地IP订阅地址：http://$suburl/sbox.json"
 echo "聚合协议本地IP订阅地址：http://$suburl/jhsub.txt"
-echo "二维码图片目录：http://$suburl/qrcodes/"
-echo "提示：请用网页浏览器打开二维码图片地址，然后扫码导入。"
-for qrpng in "$HOME"/agsbx/qrcodes/*.png; do
-[ -f "$qrpng" ] || continue
-echo "二维码图片：$(basename "$qrpng" .png)  http://$suburl/qrcodes/$(basename "$qrpng")"
-done
+generate_qr_index
+echo "节点信息汇总网页地址：http://$suburl/qrcodes/index.html"
+echo "提示：请用网页浏览器打开上方汇总网页，可查看全部节点信息并复制使用。"
 echo "**********************************************************"
 fi
 fi
 echo
 echo "---------------------------------------------------------"
 printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
-printf '\033[1;31m%s\033[0m\n' "向上翻看节点分享链接和二维码图片网页地址"
+printf '\033[1;31m%s\033[0m\n' "向上翻看节点分享链接和节点信息汇总网页地址"
 printf '\033[1;31m%s\033[0m\n' "↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑"
 echo "聚合节点文件：$HOME/agsbx/jhsub.txt"
 echo "查看节点命令：cat $HOME/agsbx/jhsub.txt"
@@ -2799,12 +2988,26 @@ if [ -n "$sub" ]; then
 show_progress 82 "生成订阅文件和本地订阅服务"
 subtokenipsub(){
 if [ -z "$subid" ]; then
-subtoken="$(cat "$HOME/agsbx/uuid")"
+if [ -s "$HOME/agsbx/subtoken.log" ]; then
+subtoken=$(cat "$HOME/agsbx/subtoken.log")
+else
+subtoken=$(random_url_token)
+fi
 else
 subtoken="$subid"
 fi
-rm -rf $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"
-echo $subtoken > $HOME/agsbx/subtoken.log
+case "$subtoken" in
+*[!A-Za-z0-9._-]*|"")
+echo "订阅路径 token 只能包含字母、数字、点、下划线和横线。"
+exit 1
+;;
+esac
+old_subtoken=$(cat "$HOME/agsbx/subtoken.log" 2>/dev/null)
+case "$old_subtoken" in
+""|"$subtoken") ;;
+*) rm -rf "$HOME/websbx/$old_subtoken" ;;
+esac
+printf '%s\n' "$subtoken" > "$HOME/agsbx/subtoken.log"
 }
 subportipsub(){
 if [ -z "$subpt" ]; then
@@ -2821,11 +3024,13 @@ echo $subport > $HOME/agsbx/subport.log
 subtokenipsub && subportipsub
 echo "请稍后…………"
 kill -15 $(pgrep -f 'websbx' 2>/dev/null) >/dev/null 2>&1
-mkdir -p $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"
-ln -sf $HOME/agsbx/clmi.yaml $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"/clmi.yaml
-ln -sf $HOME/agsbx/sbox.json $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"/sbox.json
-ln -sf $HOME/agsbx/jhsub.txt $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"/jhsub.txt
-ln -sfn $HOME/agsbx/qrcodes $HOME/websbx/"$(cat $HOME/agsbx/subtoken.log 2>/dev/null)"/qrcodes
+web_token=$(cat "$HOME/agsbx/subtoken.log" 2>/dev/null)
+mkdir -p "$HOME/websbx/$web_token"
+chmod 711 "$HOME/websbx" "$HOME/websbx/$web_token" 2>/dev/null || true
+ln -sf "$HOME/agsbx/clmi.yaml" "$HOME/websbx/$web_token/clmi.yaml"
+ln -sf "$HOME/agsbx/sbox.json" "$HOME/websbx/$web_token/sbox.json"
+ln -sf "$HOME/agsbx/jhsub.txt" "$HOME/websbx/$web_token/jhsub.txt"
+ln -sfn "$HOME/agsbx/qrcodes" "$HOME/websbx/$web_token/qrcodes"
 if command -v apk >/dev/null 2>&1; then
 busybox-extras httpd -f -p "$(cat $HOME/agsbx/subport.log 2>/dev/null)" -h $HOME/websbx > /dev/null 2>&1 &
 else
@@ -2868,7 +3073,7 @@ rc-service iptables save >/dev/null 2>&1
 rc-service ip6tables save >/dev/null 2>&1
 fi
 fi
-show_progress 92 "整理节点分享链接和二维码"
+show_progress 92 "整理节点分享链接和汇总网页"
 cip
 show_progress 100 "安装完成"
 echo
