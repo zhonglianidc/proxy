@@ -1881,6 +1881,9 @@ echo "Argo：未启用"
 fi
 }
 cip(){
+rm -rf "$HOME/agsbx/qrcodes"
+mkdir -p "$HOME/agsbx/qrcodes"
+chmod 700 "$HOME/agsbx" "$HOME/agsbx/qrcodes" 2>/dev/null || true
 ipbest(){
 serip=$( (command -v curl >/dev/null 2>&1 && (curl -s4m5 -k "$v46url" 2>/dev/null || curl -s6m5 -k "$v46url" 2>/dev/null) ) || (command -v wget >/dev/null 2>&1 && (timeout 3 wget -4 -qO- --tries=2 "$v46url" 2>/dev/null || timeout 3 wget -6 -qO- --tries=2 "$v46url" 2>/dev/null) ) )
 if echo "$serip" | grep -q ':'; then
@@ -2341,7 +2344,7 @@ fi
 if grep tuic5-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "Tuic"
 port_tu=$(cat "$HOME/agsbx/port_tu")
-tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&insecure=1&allow_insecure=1#$hostname"
+tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&insecure=1#$hostname"
 echo "$tuic5_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$tuic5_link" "tuic5"
 sbtupt(){
