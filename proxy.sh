@@ -2840,13 +2840,19 @@ showsubtoken=$(cat $HOME/agsbx/subtoken.log 2>/dev/null)
 subip=$(cat $HOME/agsbx/server_ip.log 2>/dev/null)
 suburl="$subip:$showsubport/$showsubtoken"
 echo "**********************************************************"
-echo "Clash/Mihomo本地IP订阅地址：http://$suburl/clmi.yaml"
-echo "Sing-box本地IP订阅地址：http://$suburl/sbox.json"
-echo "聚合协议本地IP订阅地址：http://$suburl/jhsub.txt"
+echo "**********************************************************"
 generate_qr_index
 printf '\033[1;33m%s\033[0m\n' "二维码请在游览器打开下面网址"
 printf '\033[1;32m%s\033[0m\n' "http://$suburl/qrcodes/index.html"
 printf '\033[1;36m%s\033[0m\n' "提示：请用网页浏览器打开上方汇总网页，可查看全部节点信息并复制使用。"
+echo "**********************************************************"
+echo "**********************************************************"
+echo
+echo
+echo "**********************************************************"
+echo "Clash/Mihomo本地IP订阅地址：http://$suburl/clmi.yaml"
+echo "Sing-box本地IP订阅地址：http://$suburl/sbox.json"
+echo "聚合协议本地IP订阅地址：http://$suburl/jhsub.txt"
 echo "**********************************************************"
 fi
 fi
