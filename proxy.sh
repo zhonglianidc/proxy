@@ -2194,7 +2194,7 @@ fi
 if grep anytls-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "AnyTLS"
 port_an=$(cat "$HOME/agsbx/port_an")
-an_link="anytls://$uuid@$server_ip:$port_an?insecure=1&allowInsecure=1#$hostname"
+an_link="anytls://$uuid@$server_ip:$port_an?insecure=1#$hostname"
 echo "$an_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$an_link" "anytls"
 sbanpt(){
@@ -2293,7 +2293,7 @@ EOF
 else
 hyps=
 fi
-hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1&allowInsecure=1$hyps&sni=www.bing.com#$hostname"
+hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1$hyps&sni=www.bing.com#$hostname"
 echo "$hy2_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$hy2_link" "hysteria2"
 sbhypt(){
@@ -2341,7 +2341,7 @@ fi
 if grep tuic5-sb "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
 print_section "Tuic"
 port_tu=$(cat "$HOME/agsbx/port_tu")
-tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&insecure=1&allowInsecure=1&allow_insecure=1#$hostname"
+tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&insecure=1&allow_insecure=1#$hostname"
 echo "$tuic5_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$tuic5_link" "tuic5"
 sbtupt(){
@@ -2544,7 +2544,7 @@ echo "- \"$clname_argo_tls\""
 echo "- \"$clname_argo\""
 }
 elif [ "$vlvm" = "Vless" ]; then
-vwatls_link1="vless://$uuid@$cdnip1:443?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=tls&sni=$argodomain&fp=chrome&insecure=0&allowInsecure=0#$hostname"
+vwatls_link1="vless://$uuid@$cdnip1:443?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=tls&sni=$argodomain&fp=chrome&insecure=0#$hostname"
 echo "$vwatls_link1" >> "$HOME/agsbx/jhsub.txt"
 vwa_link2="vless://$uuid@$cdnip2:80?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=none#$hostname"
 echo "$vwa_link2" >> "$HOME/agsbx/jhsub.txt"
