@@ -670,23 +670,28 @@ h1{font-size:26px;margin:0 0 6px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
 .card{background:#121a33;border:1px solid #26345f;border-radius:8px;padding:14px;box-shadow:0 10px 26px rgba(0,0,0,.22)}
 .socks-card{grid-column:1/-1}
+.sub-card{grid-column:1/-1}
+.compact-card{padding-top:13px}
 .card-head{display:flex;justify-content:center;margin-bottom:12px}
+.compact-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
 .protocol-pill{color:#c4b5fd;background:#1d1739;border:1px solid #4c3b82;border-radius:999px;padding:5px 10px;font-size:12px;line-height:1;white-space:nowrap}
 .qrbox{min-height:248px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
 img{width:220px;height:220px;object-fit:contain;background:#fff;padding:8px;border-radius:6px;display:block}
 .noqr{width:220px;min-height:120px;border:1px dashed #36527f;border-radius:6px;color:#fbbf24;display:flex;align-items:center;justify-content:center;text-align:center;padding:14px;background:#0c1328}
 .socks-layout{display:grid;gap:10px}
-.socks-note{color:#facc15;font-size:13px;margin:-2px 0 4px}
-.info-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:4px;color:#dbeafe;font-size:13px}
-.info-list div{border:1px solid #263b6c;background:#0c1328;border-radius:7px;padding:9px 10px}
-.info-list span{display:block;color:#94a3b8;margin-bottom:5px}
-.info-list strong{display:block;color:#86efac;font-weight:600;word-break:break-all;text-align:left}
+.socks-info{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.socks-info div{border:1px solid #263b6c;background:#0c1328;border-radius:7px;padding:9px 10px;min-width:0}
+.socks-info span{display:block;color:#94a3b8;font-size:12px;margin-bottom:5px}
+.socks-info strong{display:block;color:#86efac;font-size:13px;word-break:break-all}
+.socks-fields{display:grid;gap:10px}
 .label{font-size:12px;color:#facc15;margin-bottom:6px}
 .copy-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
 .copy-btn{border:1px solid #2f477b;background:#17244a;color:#dbeafe;border-radius:6px;padding:7px 10px;font-size:12px;cursor:pointer}
 .copy-btn.done{border-color:#22c55e;color:#86efac;background:#12351f}
 textarea{width:100%;min-height:126px;resize:vertical;border:1px solid #2d3b68;border-radius:6px;background:#0c1328;color:#86efac;padding:10px;font-size:12px;line-height:1.45}
-@media(max-width:720px){.wrap{padding:16px}.head{display:block}.badge{display:inline-block;margin-top:10px}.info-list{grid-template-columns:1fr 1fr}img{width:200px;height:200px}.noqr{width:200px}}
+.socks-card textarea{min-height:46px}
+.sub-card textarea{min-height:48px;overflow:hidden}
+@media(max-width:720px){.wrap{padding:16px}.head{display:block}.badge{display:inline-block;margin-top:10px}.socks-info{grid-template-columns:1fr 1fr}img{width:200px;height:200px}.noqr{width:200px}}
 </style>
 </head>
 <body>
@@ -745,20 +750,39 @@ SOCKS5_IP=$(html_escape "$(sed -n 's/^客户端IP：//p' "$socks_txt" | head -n 
 SOCKS5_PORT=$(html_escape "$(sed -n 's/^端口号：//p' "$socks_txt" | head -n 1)")
 SOCKS5_USER=$(html_escape "$(sed -n 's/^用户名：//p' "$socks_txt" | head -n 1)")
 SOCKS5_PASS=$(html_escape "$(sed -n 's/^密码：//p' "$socks_txt" | head -n 1)")
+SOCKS5_FP=$(html_escape "$(sed -n 's/^指纹浏览器格式：//p' "$socks_txt" | head -n 1)")
+SOCKS5_LINK=$(html_escape "$(sed -n 's/^节点分享链接：//p' "$socks_txt" | head -n 1)")
 cat >> "$indexfile" <<EOF
-<div class="card socks-card">
-<div class="card-head"><div class="protocol-pill">$escname</div></div>
+<div class="card socks-card compact-card">
+<div class="compact-head"><div class="label">Socks5 节点信息</div></div>
 <div class="socks-layout">
-<p class="socks-note">Socks5 不生成二维码，适合指纹浏览器或代理软件手动填写。</p>
-<div class="info-list">
+<div class="socks-info">
 <div><span>客户端IP</span><strong>$SOCKS5_IP</strong></div>
 <div><span>端口号</span><strong>$SOCKS5_PORT</strong></div>
 <div><span>用户名</span><strong>$SOCKS5_USER</strong></div>
 <div><span>密码</span><strong>$SOCKS5_PASS</strong></div>
 </div>
-<div class="copy-row"><div class="label">Socks5 节点信息</div><button class="copy-btn" type="button" data-copy="node-$escname">复制</button></div>
-<textarea id="node-$escname" readonly>$esclink</textarea>
+<div class="socks-fields">
+<div>
+<div class="copy-row"><div class="label">指纹浏览器格式</div><button class="copy-btn" type="button" data-copy="socks-format">复制</button></div>
+<textarea id="socks-format" readonly>$SOCKS5_FP</textarea>
 </div>
+<div>
+<div class="copy-row"><div class="label">节点分享链接</div><button class="copy-btn" type="button" data-copy="socks-link">复制</button></div>
+<textarea id="socks-link" readonly>$SOCKS5_LINK</textarea>
+</div>
+</div>
+</div>
+</div>
+EOF
+fi
+clash_sub_url=$(qr_index_web_url 2>/dev/null | sed 's#/qrcodes/index.html#/clmi.yaml#')
+if [ -n "$clash_sub_url" ]; then
+esc_clash_sub_url=$(html_escape "$clash_sub_url")
+cat >> "$indexfile" <<EOF
+<div class="card sub-card compact-card">
+<div class="compact-head"><div class="label">Clash/Mihomo 订阅链接</div><button class="copy-btn" type="button" data-copy="clash-sub">复制</button></div>
+<textarea id="clash-sub" readonly>$esc_clash_sub_url</textarea>
 </div>
 EOF
 fi

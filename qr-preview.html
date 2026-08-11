@@ -68,10 +68,20 @@
     .socks-card {
       grid-column: 1 / -1;
     }
+    .compact-card {
+      padding-top: 13px;
+    }
     .card-head {
       display: flex;
       justify-content: center;
       margin-bottom: 12px;
+    }
+    .compact-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
     }
     .protocol-pill {
       color: #c4b5fd;
@@ -121,10 +131,8 @@
       display: grid;
       gap: 10px;
     }
-    .socks-note {
-      color: #facc15;
-      font-size: 13px;
-      margin: -2px 0 4px;
+    .sub-card {
+      grid-column: 1 / -1;
     }
     .label {
       color: #facc15;
@@ -168,36 +176,46 @@
       line-height: 1.5;
       outline: none;
     }
-    .info-list {
+    .socks-card textarea {
+      min-height: 46px;
+    }
+    .socks-info {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 8px;
-      margin-bottom: 4px;
-      color: #dbeafe;
-      font-size: 13px;
+      margin-bottom: 12px;
     }
-    .info-list div {
+    .socks-info div {
       border: 1px solid #263b6c;
       background: #0c1328;
       border-radius: 7px;
       padding: 9px 10px;
+      min-width: 0;
     }
-    .info-list span {
+    .socks-info span {
       display: block;
       color: #94a3b8;
+      font-size: 12px;
       margin-bottom: 5px;
     }
-    .info-list strong {
+    .socks-info strong {
       display: block;
       color: #86efac;
-      font-weight: 600;
+      font-size: 13px;
       word-break: break-all;
-      text-align: left;
+    }
+    .socks-fields {
+      display: grid;
+      gap: 10px;
+    }
+    .sub-card textarea {
+      min-height: 48px;
+      overflow: hidden;
     }
     @media (max-width: 720px) {
       .topbar { display: block; }
       .status { justify-content: flex-start; margin-top: 12px; }
-      .info-list { grid-template-columns: 1fr 1fr; }
+      .socks-info { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -251,24 +269,42 @@
         <textarea id="ss-link" readonly>ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ@82.139.205.12:22362#德国-82.139.205.12</textarea>
       </article>
 
-      <article class="card socks-card">
-        <div class="card-head">
-          <div class="protocol-pill">socks5</div>
+      <article class="card socks-card compact-card">
+        <div class="compact-head">
+          <p class="label">Socks5 节点信息</p>
         </div>
         <div class="socks-layout">
-          <p class="socks-note">Socks5 不生成二维码，适合指纹浏览器或代理软件手动填写。</p>
-          <div class="info-list">
+          <div class="socks-info">
             <div><span>客户端IP</span><strong>82.139.205.12</strong></div>
             <div><span>端口号</span><strong>33197</strong></div>
             <div><span>用户名</span><strong>jz1Q203Xok1H</strong></div>
             <div><span>密码</span><strong>jz1Q203Xok1H</strong></div>
           </div>
-          <div class="copy-row">
-            <p class="label">指纹浏览器格式</p>
-            <button class="copy-btn" type="button" data-copy="socks-format">复制</button>
+          <div class="socks-fields">
+            <div>
+              <div class="copy-row">
+                <p class="label">指纹浏览器格式</p>
+                <button class="copy-btn" type="button" data-copy="socks-format">复制</button>
+              </div>
+              <textarea id="socks-format" readonly>82.139.205.12:33197:jz1Q203Xok1H:jz1Q203Xok1H</textarea>
+            </div>
+            <div>
+              <div class="copy-row">
+                <p class="label">节点分享链接</p>
+                <button class="copy-btn" type="button" data-copy="socks-link">复制</button>
+              </div>
+              <textarea id="socks-link" readonly>socks://OUlsVUpOQVQydDhwOjlJbFVKTkFUMnQ4cA@82.139.205.12:33197#德国-82.139.205.12</textarea>
+            </div>
           </div>
-          <textarea id="socks-format" readonly>82.139.205.12:33197:jz1Q203Xok1H:jz1Q203Xok1H</textarea>
         </div>
+      </article>
+
+      <article class="card sub-card compact-card">
+        <div class="compact-head">
+          <p class="label">Clash/Mihomo 订阅链接</p>
+          <button class="copy-btn" type="button" data-copy="clash-sub">复制</button>
+        </div>
+        <textarea id="clash-sub" readonly>http://82.139.205.12:25714/bQl5hX36C2meAC0qF5NMf4CghOU3f2Bm/clmi.yaml</textarea>
       </article>
     </section>
   </main>
