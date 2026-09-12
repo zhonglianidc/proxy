@@ -99,7 +99,7 @@ age_ts=$((now_ts - latest_ts))
 }
 install_dependencies(){
 [ "$1" = "del" ] && return
-required_deps="curl wget unzip tar gzip openssl awk sed grep find iptables crontab timeout base64 sha256sum tr head xargs readlink pgrep"
+required_deps="curl wget unzip tar gzip openssl awk sed grep find iptables crontab timeout base64 sha256sum tr head xargs readlink pgrep busybox"
 missing=""
 for cmd in $required_deps; do
 command -v "$cmd" >/dev/null 2>&1 || missing="$missing $cmd"
@@ -312,7 +312,7 @@ if [ "$1" = "rep" ]; then
 [ "$vwp" = yes ] || [ "$sop" = yes ] || [ "$vxp" = yes ] || [ "$ssp" = yes ] || [ "$vlp" = yes ] || [ "$vmp" = yes ] || [ "$hyp" = yes ] || [ "$tup" = yes ] || [ "$xhp" = yes ] || [ "$anp" = yes ] || [ "$arp" = yes ] || { echo "提示：rep重置协议时，请在脚本前至少设置一个协议变量哦，再见！💣"; exit; }
 fi
 else
-[ "$1" = "del" ] || [ "$vwp" = yes ] || [ "$sop" = yes ] || [ "$vxp" = yes ] || [ "$ssp" = yes ] || [ "$vlp" = yes ] || [ "$vmp" = yes ] || [ "$hyp" = yes ] || [ "$tup" = yes ] || [ "$xhp" = yes ] || [ "$anp" = yes ] || [ "$arp" = yes ] || { echo "提示：未安装一键节点脚本，请在脚本前至少设置一个协议变量。"; exit; }
+[ "$1" = "del" ] || [ "$1" = "list" ] || [ "$1" = "port" ] || [ "$1" = "upx" ] || [ "$1" = "ups" ] || [ "$1" = "res" ] || [ "$vwp" = yes ] || [ "$sop" = yes ] || [ "$vxp" = yes ] || [ "$ssp" = yes ] || [ "$vlp" = yes ] || [ "$vmp" = yes ] || [ "$hyp" = yes ] || [ "$tup" = yes ] || [ "$xhp" = yes ] || [ "$anp" = yes ] || [ "$arp" = yes ] || { echo "提示：未安装一键节点脚本，请在脚本前至少设置一个协议变量。"; exit; }
 fi
 export uuid=${uuid:-''}
 export port_vl_re=${vlpt:-''}
@@ -347,6 +347,7 @@ echo "备用命令：bash <(wget -qO- ${proxyurl})"
 echo ""
 echo "快捷命令："
 echo "  proxy list        显示节点信息"
+echo "  proxy port        交互修改节点端口"
 echo "  proxy rep         重置并重新生成协议"
 echo "  proxy upx         更新 Xray 内核"
 echo "  proxy ups         更新 Sing-box 内核"
@@ -3159,6 +3160,184 @@ else
 nohup $HOME/agsbx/sing-box run -c $HOME/agsbx/sb.json >/dev/null 2>&1 &
 fi
 }
+port_read(){
+[ -f "$HOME/agsbx/$1" ] && cat "$HOME/agsbx/$1" 2>/dev/null
+}
+port_add_option(){
+opt_name="$1"
+opt_file="$2"
+opt_key="$3"
+opt_core="$4"
+opt_port=$(port_read "$opt_file")
+[ -n "$opt_port" ] || return
+port_i=$((port_i + 1))
+printf '%s|%s|%s|%s|%s\n' "$port_i" "$opt_name" "$opt_file" "$opt_key" "$opt_core" >> "$port_menu_file"
+printf '\033[1;36m%2s.\033[0m %-28s 当前端口：\033[1;32m%s\033[0m\n' "$port_i" "$opt_name" "$opt_port"
+}
+port_build_menu(){
+port_menu_file="/tmp/proxy_ports.$$"
+rm -f "$port_menu_file"
+port_i=0
+echo "============================================================"
+echo "当前已安装协议端口如下："
+echo "============================================================"
+if grep -q 'xhttp-reality' "$HOME/agsbx/xr.json" 2>/dev/null; then port_add_option "Vless XHTTP Reality" "port_xh" "xhp" "xray"; fi
+if grep -q 'vless-xhttp' "$HOME/agsbx/xr.json" 2>/dev/null; then port_add_option "Vless XHTTP" "port_vx" "vxp" "xray"; fi
+if grep -q 'vless-ws' "$HOME/agsbx/xr.json" 2>/dev/null; then port_add_option "Vless WS" "port_vw" "vwp" "xray"; fi
+if grep -q 'reality-vision' "$HOME/agsbx/xr.json" 2>/dev/null; then port_add_option "Vless TCP Reality Vision" "port_vl_re" "vlp" "xray"; fi
+if grep -q 'vmess-xr' "$HOME/agsbx/xr.json" 2>/dev/null || grep -q 'vmess-sb' "$HOME/agsbx/sb.json" 2>/dev/null; then port_add_option "Vmess WS" "port_vm_ws" "vmp" "both"; fi
+if grep -q 'socks5-xr' "$HOME/agsbx/xr.json" 2>/dev/null || grep -q 'socks5-sb' "$HOME/agsbx/sb.json" 2>/dev/null; then port_add_option "Socks5" "port_so" "sop" "both"; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"hy2-sb"' "$HOME/agsbx/sb.json" 2>/dev/null; then port_add_option "Hysteria2" "port_hy2" "hyp" "sing-box"; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"tuic5-sb"' "$HOME/agsbx/sb.json" 2>/dev/null; then port_add_option "Tuic" "port_tu" "tup" "sing-box"; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"anytls-sb"' "$HOME/agsbx/sb.json" 2>/dev/null; then port_add_option "AnyTLS" "port_an" "anp" "sing-box"; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"anyreality-sb"' "$HOME/agsbx/sb.json" 2>/dev/null; then port_add_option "AnyTLS Reality" "port_ar" "arp" "sing-box"; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"ss"' "$HOME/agsbx/sb.json" 2>/dev/null; then port_add_option "Shadowsocks" "port_ss" "ssp" "sing-box"; fi
+if [ "$port_i" -eq 0 ]; then
+echo "未检测到已安装的协议端口，请先安装节点。"
+rm -f "$port_menu_file"
+return 1
+fi
+echo "============================================================"
+}
+port_valid(){
+case "$1" in
+""|*[!0-9]*) return 1 ;;
+esac
+[ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null
+}
+port_used_by_other_protocol(){
+new_port="$1"
+skip_file="$2"
+for pf in port_vl_re port_vm_ws port_vw port_hy2 port_tu port_xh port_vx port_an port_ar port_ss port_so subport.log; do
+[ "$pf" = "$skip_file" ] && continue
+oldp=$(port_read "$pf")
+[ -n "$oldp" ] && [ "$oldp" = "$new_port" ] && return 0
+done
+return 1
+}
+detect_installed_protocol_flags(){
+old_has_xray=no
+old_has_singbox=no
+xhp=; vxp=; vwp=; vlp=; vmp=; sop=; hyp=; tup=; anp=; arp=; ssp=
+if grep -q 'xhttp-reality' "$HOME/agsbx/xr.json" 2>/dev/null; then xhp=xhpt; old_has_xray=yes; fi
+if grep -q 'vless-xhttp' "$HOME/agsbx/xr.json" 2>/dev/null; then vxp=vxpt; old_has_xray=yes; fi
+if grep -q 'vless-ws' "$HOME/agsbx/xr.json" 2>/dev/null; then vwp=vwpt; old_has_xray=yes; fi
+if grep -q 'reality-vision' "$HOME/agsbx/xr.json" 2>/dev/null; then vlp=vlpt; old_has_xray=yes; fi
+if grep -q 'vmess-xr' "$HOME/agsbx/xr.json" 2>/dev/null; then vmp=vmpt; old_has_xray=yes; fi
+if grep -q 'socks5-xr' "$HOME/agsbx/xr.json" 2>/dev/null; then sop=sopt; old_has_xray=yes; fi
+if grep -q 'vmess-sb' "$HOME/agsbx/sb.json" 2>/dev/null; then vmp=vmpt; old_has_singbox=yes; fi
+if grep -q 'socks5-sb' "$HOME/agsbx/sb.json" 2>/dev/null; then sop=sopt; old_has_singbox=yes; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"hy2-sb"' "$HOME/agsbx/sb.json" 2>/dev/null; then hyp=hypt; old_has_singbox=yes; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"tuic5-sb"' "$HOME/agsbx/sb.json" 2>/dev/null; then tup=tupt; old_has_singbox=yes; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"anytls-sb"' "$HOME/agsbx/sb.json" 2>/dev/null; then anp=anpt; old_has_singbox=yes; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"anyreality-sb"' "$HOME/agsbx/sb.json" 2>/dev/null; then arp=arpt; old_has_singbox=yes; fi
+if grep -q '"tag"[[:space:]]*:[[:space:]]*"ss"' "$HOME/agsbx/sb.json" 2>/dev/null; then ssp=sspt; old_has_singbox=yes; fi
+}
+current_hy2_jump_ports(){
+hy2_now="$1"
+[ -n "$hy2_now" ] || return
+iptables -t nat -nL PREROUTING 2>/dev/null | grep -w "$hy2_now" | awk '{print $8}' | sed 's/dpts://; s/dpt://' | tr ',' ' ' | tr '\n' ' '
+}
+refresh_hy2_jump_ports(){
+[ -n "$1" ] || return
+[ -n "$2" ] || return
+iptables -t nat -F PREROUTING >/dev/null 2>&1
+ip6tables -t nat -F PREROUTING >/dev/null 2>&1
+for hp in $1; do
+iptables -t nat -A PREROUTING -p udp --dport "$hp" -j DNAT --to-destination :"$2" >/dev/null 2>&1
+ip6tables -t nat -A PREROUTING -p udp --dport "$hp" -j DNAT --to-destination :"$2" >/dev/null 2>&1
+done
+netfilter-persistent save >/dev/null 2>&1
+rc-service iptables save >/dev/null 2>&1
+rc-service ip6tables save >/dev/null 2>&1
+}
+rebuild_after_port_change(){
+detect_installed_protocol_flags
+changed_file="$1"
+new_port="$2"
+old_hy2_port=$(port_read port_hy2)
+hy2_jump_ports=$(current_hy2_jump_ports "$old_hy2_port")
+echo "$new_port" > "$HOME/agsbx/$changed_file"
+ym_vl_re=$(cat "$HOME/agsbx/ym_vl_re" 2>/dev/null)
+cdnym=$(cat "$HOME/agsbx/cdnym" 2>/dev/null)
+if pidof systemd >/dev/null 2>&1; then
+systemctl stop xr sb >/dev/null 2>&1
+elif command -v rc-service >/dev/null 2>&1; then
+rc-service xray stop >/dev/null 2>&1
+rc-service sing-box stop >/dev/null 2>&1
+else
+kill -15 $(pgrep -f 'agsbx/x' 2>/dev/null) $(pgrep -f 'agsbx/s' 2>/dev/null) >/dev/null 2>&1
+fi
+rm -f "$HOME/agsbx/xr.json" "$HOME/agsbx/sb.json"
+if [ "$old_has_singbox" = no ]; then
+installxray
+xrsbvm
+xrsbso
+warpsx
+xrsbout
+elif [ "$old_has_xray" = no ]; then
+installsb
+xrsbvm
+xrsbso
+warpsx
+xrsbout
+else
+installsb
+installxray
+xrsbvm
+xrsbso
+warpsx
+xrsbout
+fi
+if [ "$changed_file" = "port_hy2" ] && [ -n "$hy2_jump_ports" ]; then
+refresh_hy2_jump_ports "$hy2_jump_ports" "$new_port"
+fi
+xrestart
+sbrestart
+sleep 2
+cip
+}
+change_node_port(){
+if [ ! -d "$HOME/agsbx" ]; then
+echo "未检测到脚本安装目录，请先安装节点。"
+exit 1
+fi
+port_build_menu || exit 1
+printf '请输入要修改的协议编号：'
+read choice
+selected_line=$(grep "^${choice}|" "$port_menu_file" 2>/dev/null)
+rm -f "$port_menu_file"
+if [ -z "$selected_line" ]; then
+echo "选择无效，已取消。"
+exit 1
+fi
+selected_name=$(printf '%s' "$selected_line" | cut -d'|' -f2)
+selected_file=$(printf '%s' "$selected_line" | cut -d'|' -f3)
+old_port=$(port_read "$selected_file")
+printf '请输入 %s 的新端口：' "$selected_name"
+read new_port
+if ! port_valid "$new_port"; then
+echo "端口格式错误，请输入 1-65535 之间的数字。"
+exit 1
+fi
+if [ "$new_port" = "$old_port" ]; then
+echo "新端口和当前端口相同，无需修改。"
+exit 0
+fi
+if port_used_by_other_protocol "$new_port" "$selected_file"; then
+echo "端口 $new_port 已被当前脚本的其它协议或订阅服务使用，请换一个端口。"
+exit 1
+fi
+if ss -lntup 2>/dev/null | grep -Eq "[:.]${new_port}[[:space:]]"; then
+echo "端口 $new_port 当前已被系统占用，请换一个端口。"
+exit 1
+fi
+echo "正在将 $selected_name 端口从 $old_port 修改为 $new_port，请稍等..."
+rebuild_after_port_change "$selected_file" "$new_port"
+echo
+echo "端口修改完成：$selected_name $old_port -> $new_port"
+echo "节点分享链接、二维码汇总网页和 Clash/Mihomo 订阅已同步更新。"
+}
 if [ "$1" = "del" ]; then
 cleandel
 rm -rf sbx_update "$HOME/agsbx" "$HOME/websbx"
@@ -3176,6 +3355,9 @@ echo "一键节点脚本生成" && sleep 2
 echo
 elif [ "$1" = "list" ]; then
 cip
+exit
+elif [ "$1" = "port" ]; then
+change_node_port
 exit
 elif [ "$1" = "upx" ]; then
 for P in /proc/[0-9]*; do [ -L "$P/exe" ] || continue; TARGET=$(readlink -f "$P/exe" 2>/dev/null) || continue; case "$TARGET" in *"/agsbx/x"*) kill "$(basename "$P")" 2>/dev/null ;; esac; done
