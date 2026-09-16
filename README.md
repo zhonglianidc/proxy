@@ -58,7 +58,7 @@ vmpt="" vwpt="" sopt="" sspt="" bash <(curl -Ls https://raw.githubusercontent.co
 proxy list   # 显示节点
 proxy rep    # 按新变量重置/更新配置
 proxy res    # 重启脚本服务
-proxy upx    # 更新 Xray 内核
+proxy upx    # 更新 Xray 内核到脚本固定版本
 proxy ups    # 更新 Sing-box 内核
 proxy del    # 卸载
 ```
@@ -71,3 +71,4 @@ proxy del    # 卸载
 - Socks5 只显示客户端 IP、端口号、用户名、密码、分享链接和指纹浏览器格式。
 - Reality 域名留空时，脚本会自动从候选域名里测速选择延迟最低的目标，候选列表包含 `xp.apple.com`。
 - Hysteria2 使用自签证书时，分享链接和 Clash 配置已默认开启跳过证书校验，避免部分客户端导入后证书验证失败。
+- Xray 默认固定为脚本内置版本，避免最新版频繁变化造成兼容问题；如需临时指定版本，可在命令前加 `XRAY_VERSION=v26.3.27`。

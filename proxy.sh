@@ -1,5 +1,6 @@
 #!/bin/sh
-SCRIPT_VERSION=${SCRIPT_VERSION:-v1.1.0-20260810}
+SCRIPT_VERSION=${SCRIPT_VERSION:-v1.1.1-20260916}
+XRAY_VERSION=${XRAY_VERSION:-v26.3.27}
 PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh}
 if [ -z "${PROXY_SELECTED_KEYS+x}" ]; then
 PROXY_SELECTED_KEYS=""
@@ -20,7 +21,7 @@ fi
 if [ "$(id -u 2>/dev/null)" != "0" ]; then
 if command -v sudo >/dev/null 2>&1; then
 echo "当前环境非root用户权限，正在尝试使用 sudo 自动提权..."
-exec sudo -E -H env SCRIPT_VERSION="$SCRIPT_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
+exec sudo -E -H env SCRIPT_VERSION="$SCRIPT_VERSION" XRAY_VERSION="$XRAY_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
 fi
 echo "当前环境非root用户权限，请先输入 sudo -i 命令"
 exit 1
@@ -349,7 +350,7 @@ echo "快捷命令："
 echo "  proxy list        显示节点信息"
 echo "  proxy port        交互修改节点端口"
 echo "  proxy rep         重置并重新生成协议"
-echo "  proxy upx         更新 Xray 内核"
+echo "  proxy upx         更新 Xray 内核到固定版本"
 echo "  proxy ups         更新 Sing-box 内核"
 echo "  proxy res         重启节点服务"
 echo "  proxy del         卸载脚本"
@@ -512,13 +513,13 @@ amd64) xray_file='Xray-linux-64.zip' ;;
 arm64) xray_file='Xray-linux-arm64-v8a.zip' ;;
 *) echo "Xray does not support $(uname -m) architecture yet" && exit 1 ;;
 esac
-xray_tag=$(github_latest_tag "XTLS/Xray-core")
-case "$xray_tag" in v*) ;; *) echo "Failed to get latest Xray release tag"; exit 1 ;; esac
+xray_tag="$XRAY_VERSION"
+case "$xray_tag" in v*) ;; *) xray_tag="v$xray_tag" ;; esac
 url="https://github.com/XTLS/Xray-core/releases/download/${xray_tag}/${xray_file}"
 tmpdir="$HOME/agsbx/xray_tmp"
 rm -rf "$tmpdir" && mkdir -p "$tmpdir"
 archive="$tmpdir/xray.zip"
-echo "Downloading latest official Xray core: $url"
+echo "Downloading pinned official Xray core (${xray_tag}): $url"
 download_file "$url" "$archive" || { echo "Xray download failed"; exit 1; }
 unzip -o -q "$archive" -d "$tmpdir" || { echo "Xray unzip failed"; exit 1; }
 [ -f "$tmpdir/xray" ] || { echo "Xray binary was not found in archive"; exit 1; }
@@ -526,7 +527,7 @@ mv -f "$tmpdir/xray" "$HOME/agsbx/xray"
 chmod +x "$HOME/agsbx/xray"
 rm -rf "$tmpdir"
 sbcore=$("$HOME/agsbx/xray" version 2>/dev/null | awk '/^Xray/{print $2}')
-echo "Installed latest official Xray core: $sbcore"
+echo "Installed pinned official Xray core: $sbcore"
 }
 upsingbox(){
 case "$cpu" in
