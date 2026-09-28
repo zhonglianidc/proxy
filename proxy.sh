@@ -1,7 +1,11 @@
 #!/bin/sh
-SCRIPT_VERSION=${SCRIPT_VERSION:-v1.1.1-20260916}
+SCRIPT_VERSION=${SCRIPT_VERSION:-v1.2.0-20260928}
 XRAY_VERSION=${XRAY_VERSION:-v26.3.27}
 PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh}
+if [ -z "${PROXY_VISION_ARG_SET+x}" ]; then
+PROXY_VISION_ARG_SET=0
+[ -z "${vision+x}" ] || PROXY_VISION_ARG_SET=1
+fi
 if [ -z "${PROXY_SELECTED_KEYS+x}" ]; then
 PROXY_SELECTED_KEYS=""
 [ -z "${sopt+x}" ] || PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS sopt"
@@ -21,7 +25,7 @@ fi
 if [ "$(id -u 2>/dev/null)" != "0" ]; then
 if command -v sudo >/dev/null 2>&1; then
 echo "当前环境非root用户权限，正在尝试使用 sudo 自动提权..."
-exec sudo -E -H env SCRIPT_VERSION="$SCRIPT_VERSION" XRAY_VERSION="$XRAY_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
+exec sudo -E -H env SCRIPT_VERSION="$SCRIPT_VERSION" XRAY_VERSION="$XRAY_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS" PROXY_VISION_ARG_SET="$PROXY_VISION_ARG_SET" vision="${vision:-}" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
 fi
 echo "当前环境非root用户权限，请先输入 sudo -i 命令"
 exit 1
@@ -33,6 +37,18 @@ else
 export LANG=C
 unset LC_ALL
 fi
+if [ "${PROXY_VISION_ARG_SET:-0}" = "1" ]; then
+case "${vision:-y}" in
+n|N|no|NO|No|false|FALSE|False|0) vision=n ;;
+*) vision=y ;;
+esac
+elif [ -f "$HOME/agsbx/vision_mode" ]; then
+vision=$(cat "$HOME/agsbx/vision_mode" 2>/dev/null)
+[ "$vision" = "n" ] || vision=y
+else
+vision=y
+fi
+export vision
 PROXY_PROGRESS_ENABLED=0
 case "$1" in
 ""|rep) PROXY_PROGRESS_ENABLED=1 ;;
@@ -1125,6 +1141,7 @@ vwp=vwptargo
 fi
 if [ -n "$vlp" ]; then
 vlp=vlpt
+echo "$vision" > "$HOME/agsbx/vision_mode"
 if [ -z "$port_vl_re" ] && [ ! -e "$HOME/agsbx/port_vl_re" ]; then
 port_vl_re=$(shuf -i 10000-65535 -n 1)
 echo "$port_vl_re" > "$HOME/agsbx/port_vl_re"
@@ -1142,8 +1159,7 @@ cat >> "$HOME/agsbx/xr.json" <<EOF
             "settings": {
                 "clients": [
                     {
-                        "id": "${uuid}",
-                        "flow": "xtls-rprx-vision"
+                        "id": "${uuid}"$(if [ "$vision" = "y" ]; then printf ',\n                        "flow": "xtls-rprx-vision"'; fi)
                     }
                 ],
                 "decryption": "none"
@@ -2052,9 +2068,17 @@ print_link "节点分享链接：" "$vl_vw_cdn_link" "vless-ws-cdn"
 fi
 fi
 if grep reality-vision "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
-print_section "Vless TCP Reality Vision"
 port_vl_re=$(cat "$HOME/agsbx/port_vl_re")
-vl_link="vless://$uuid@$server_ip:$port_vl_re?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=tcp&headerType=none#$hostname"
+if grep -q '"flow"[[:space:]]*:[[:space:]]*"xtls-rprx-vision"' "$HOME/agsbx/xr.json" 2>/dev/null; then
+vl_vision_enabled=yes
+vl_flow_query="&flow=xtls-rprx-vision"
+print_section "Vless TCP Reality Vision"
+else
+vl_vision_enabled=no
+vl_flow_query=""
+print_section "Vless TCP Reality"
+fi
+vl_link="vless://$uuid@$server_ip:$port_vl_re?encryption=none${vl_flow_query}&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=tcp&headerType=none#$hostname"
 echo "$vl_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$vl_link" "vless-reality"
 sbvlpt(){
@@ -2065,7 +2089,7 @@ cat <<EOF
       "server": "$server_ip",
       "server_port": $port_vl_re,
       "uuid": "$uuid",
-      "flow": "xtls-rprx-vision",
+$(if [ "$vl_vision_enabled" = "yes" ]; then printf '      "flow": "xtls-rprx-vision",'; fi)
       "tls": {
         "enabled": true,
         "server_name": "$ym_vl_re",
@@ -2095,7 +2119,7 @@ cat <<EOF
   network: tcp
   udp: true
   tls: true
-  flow: xtls-rprx-vision
+$(if [ "$vl_vision_enabled" = "yes" ]; then printf '  flow: xtls-rprx-vision'; fi)
   servername: $ym_vl_re                 
   reality-opts: 
     public-key: $public_key_x    

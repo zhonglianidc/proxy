@@ -431,6 +431,12 @@
           </div>
         </div>
         <div class="row"><label>Reality 域名 <span class="pill">reym</span></label><input id="reym" type="text" placeholder="选择Reality相关协议后可用，留空自动测速选择最低延迟候选域名" disabled/></div>
+        <div class="row"><label>Vless TCP Vision <span class="pill">vision</span></label>
+          <select id="vision" disabled>
+            <option value="">默认 开启</option>
+            <option value="n">关闭（不使用 xtls-rprx-vision）</option>
+          </select>
+        </div>
         <div class="row"><label>Hysteria2端口跳跃 <span class="pill">hyjpt</span></label><input id="hyjpt" type="text" placeholder="支持多个范围端口与单端口混用(空格间隔)，例：123:456 789" disabled/></div>
         <div class="row"><label>CF解析IP的域名<span class="pill">cdnym</span></label><input id="cdnym" type="text" placeholder="Vmess-ws、Vless-xhttp/ws-enc启用80、回源CDN时可用" disabled/></div>
         <div class="row"><label>套WARP-IP出站 <span class="pill">warp</span></label>
@@ -534,7 +540,7 @@
   const CURL = 'bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)';
   const WGET = 'bash <(wget -qO- https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)';
   const protoKeys = ['sopt','vmpt','vlpt','xhpt','vxpt','vwpt','arpt','anpt','hypt','tupt','sspt'];
-  const optIds = ['warp','ippz','uuid','reym','hyjpt','cdnym','name', 'sub', 'subid', 'subpt'];
+  const optIds = ['warp','ippz','uuid','reym','vision','hyjpt','cdnym','name', 'sub', 'subid', 'subpt'];
 
   const argoSelect = document.getElementById('argoSelect');
   const agn = document.getElementById('agn');
@@ -553,6 +559,7 @@
   const hy2Checkbox = document.querySelector('[data-proto="hypt"]');
 
   const reymInput = document.getElementById('reym');
+  const visionSelect = document.getElementById('vision');
   const hyjptInput = document.getElementById('hyjpt');
   const cdnymInput = document.getElementById('cdnym');
   
@@ -617,6 +624,7 @@
     }
     document.getElementById('uuid').value = '';
     document.getElementById('reym').value = '';
+    visionSelect.value = '';
     document.getElementById('hyjpt').value = '';
     document.getElementById('name').value = '';
     sub.value = '';
@@ -634,6 +642,9 @@
       const isRealityEnabled = vlessTcpRealityCheckbox.checked || vlessXhttpRealityCheckbox.checked || anyRealityCheckbox.checked;
       reymInput.disabled = !isRealityEnabled;
       if (!isRealityEnabled) reymInput.value = '';
+
+      visionSelect.disabled = !vlessTcpRealityCheckbox.checked;
+      if (!vlessTcpRealityCheckbox.checked) visionSelect.value = '';
 
       const isHy2Enabled = hy2Checkbox.checked;
       hyjptInput.disabled = !isHy2Enabled;
@@ -747,7 +758,7 @@
     const keys = Object.keys(m);
     const ordered = [];
     protoKeys.forEach(k => { if (keys.includes(k)) ordered.push(k); });
-    ['warp', 'uuid', 'reym', 'hyjpt', 'cdnym', 'name', 'ippz', 'sub', 'subid', 'subpt'].forEach(k => { if (keys.includes(k)) ordered.push(k); });
+    ['warp', 'uuid', 'reym', 'vision', 'hyjpt', 'cdnym', 'name', 'ippz', 'sub', 'subid', 'subpt'].forEach(k => { if (keys.includes(k)) ordered.push(k); });
     if (keys.includes('argo')) ordered.push('argo');
     if (keys.includes('agn')) ordered.push('agn');
     if (keys.includes('agk')) ordered.push('agk');
@@ -823,6 +834,7 @@
     cdnymInput.disabled = !isCdnEnabled;
     const isRealityEnabled = params['vlpt'] !== undefined || params['xhpt'] !== undefined || params['arpt'] !== undefined;
     reymInput.disabled = !isRealityEnabled;
+    visionSelect.disabled = (params['vlpt'] === undefined);
     hyjptInput.disabled = (params['hypt'] === undefined);
 
     const allIds = [...optIds, 'agn', 'agk', 'cfip'];

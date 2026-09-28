@@ -50,6 +50,22 @@ vmpt="" vwpt="" sopt="" sspt="" bash <(curl -Ls https://raw.githubusercontent.co
 | AnyTLS | `anpt` | 留空随机端口 |
 | Any Reality | `arpt` | 留空随机端口 |
 
+## VLESS Reality Vision 开关
+
+`vlpt` 默认生成 VLESS TCP Reality Vision，原有命令保持不变：
+
+```bash
+sopt="" vlpt="" hypt="" sspt="" sub="y" bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)
+```
+
+如需生成不带 `xtls-rprx-vision` flow 的 VLESS TCP Reality，增加 `vision="n"`：
+
+```bash
+sopt="" vlpt="" hypt="" sspt="" sub="y" vision="n" bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)
+```
+
+脚本会同时调整 Xray 服务端、节点分享链接、Clash 和 Sing-box 配置，并保存该模式供后续查看节点或修改端口时继续使用。
+
 ## 已安装后的命令
 
 首次安装后重新连接 SSH，快捷命令才会生效。
