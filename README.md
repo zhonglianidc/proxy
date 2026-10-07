@@ -34,6 +34,8 @@ sopt="" bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/mai
 vmpt="" vwpt="" sopt="" sspt="" bash <(curl -Ls https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh)
 ```
 
+如果服务器已经存在脚本生成的节点配置，再次输入安装命令时不会直接覆盖。脚本会让用户选择“重新搭建”或“输出原节点信息”；直接回车默认查看原节点。显式执行 `proxy rep` 时仍会按用户命令重新搭建。
+
 ## 常用协议变量
 
 | 协议 | 变量 | 说明 |
@@ -75,7 +77,7 @@ proxy list   # 显示节点
 proxy rep    # 按新变量重置/更新配置
 proxy res    # 重启脚本服务
 proxy upx    # 更新 Xray 内核到脚本固定版本
-proxy ups    # 更新 Sing-box 内核
+proxy ups    # 更新 Sing-box 内核到脚本固定版本
 proxy del    # 卸载
 ```
 
@@ -86,5 +88,10 @@ proxy del    # 卸载
 - 所有节点信息会汇总到最后输出的节点信息网页地址里，用户可用网页浏览器打开查看、复制和扫码导入。
 - Socks5 只显示客户端 IP、端口号、用户名、密码、分享链接和指纹浏览器格式。
 - Reality 域名留空时，脚本会自动从候选域名里测速选择延迟最低的目标，候选列表包含 `xp.apple.com`。
+- 公网 IP 会优先通过 `ipinfo.io` 探测，并自动回退到多个备用接口；空响应、网页内容或无效地址不会覆盖已有 IP。全部接口失败且没有历史有效 IP 时，脚本会停止生成节点信息，避免产生缺少服务器地址的失效链接。
 - Hysteria2 使用自签证书时，分享链接和 Clash 配置已默认开启跳过证书校验，避免部分客户端导入后证书验证失败。
 - Xray 默认固定为脚本内置版本，避免最新版频繁变化造成兼容问题；如需临时指定版本，可在命令前加 `XRAY_VERSION=v26.3.27`。
+- Sing-box 默认固定为 `v1.13.16`；如需临时指定，可在命令前加 `SINGBOX_VERSION=v1.13.16`。
+- XHTTP、WebSocket 不添加 `xtls-rprx-vision`；Vision 开关只影响 VLESS TCP Reality。
+- 内核更新会先下载、校验和检查配置，重启失败时自动恢复旧内核。
+- HY2 端口跳跃使用独立 `PROXY_HY2` 规则链，不会清空服务器其他 NAT 转发规则。

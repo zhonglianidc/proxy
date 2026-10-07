@@ -1,6 +1,7 @@
 #!/bin/sh
-SCRIPT_VERSION=${SCRIPT_VERSION:-v1.2.0-20260928}
+SCRIPT_VERSION=${SCRIPT_VERSION:-v1.2.4-20261007}
 XRAY_VERSION=${XRAY_VERSION:-v26.3.27}
+SINGBOX_VERSION=${SINGBOX_VERSION:-v1.13.16}
 PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh}
 if [ -z "${PROXY_VISION_ARG_SET+x}" ]; then
 PROXY_VISION_ARG_SET=0
@@ -25,10 +26,26 @@ fi
 if [ "$(id -u 2>/dev/null)" != "0" ]; then
 if command -v sudo >/dev/null 2>&1; then
 echo "当前环境非root用户权限，正在尝试使用 sudo 自动提权..."
-exec sudo -E -H env SCRIPT_VERSION="$SCRIPT_VERSION" XRAY_VERSION="$XRAY_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS" PROXY_VISION_ARG_SET="$PROXY_VISION_ARG_SET" vision="${vision:-}" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
+exec sudo -E -H env SCRIPT_VERSION="$SCRIPT_VERSION" XRAY_VERSION="$XRAY_VERSION" SINGBOX_VERSION="$SINGBOX_VERSION" PROXY_SCRIPT_URL="$PROXY_SCRIPT_URL" PROXY_SELECTED_KEYS="$PROXY_SELECTED_KEYS" PROXY_VISION_ARG_SET="$PROXY_VISION_ARG_SET" vision="${vision:-}" sh -c 'if command -v curl >/dev/null 2>&1; then curl -Ls "$PROXY_SCRIPT_URL"; else wget -qO- "$PROXY_SCRIPT_URL"; fi | sh -s -- "$@"' sh "$@"
 fi
 echo "当前环境非root用户权限，请先输入 sudo -i 命令"
 exit 1
+fi
+PROXY_EXISTING_REBUILD=0
+if [ -z "$1" ] && [ -n "${PROXY_SELECTED_KEYS# }" ] && { [ -s "$HOME/agsbx/xr.json" ] || [ -s "$HOME/agsbx/sb.json" ]; }; then
+echo "============================================================"
+echo "本服务器已安装一键搭建脚本，为避免覆盖原节点，请选择操作："
+echo "  1. 重新搭建（会替换原节点配置）"
+echo "  2. 输出原来搭建的节点信息"
+echo "============================================================"
+printf '请输入选项 [1/2]，默认 2：'
+existing_choice=""
+if [ -r /dev/tty ]; then read existing_choice </dev/tty || existing_choice=""; else read existing_choice || existing_choice=""; fi
+case "$existing_choice" in
+1) PROXY_EXISTING_REBUILD=1; export PROXY_EXISTING_REBUILD ;;
+2|"") set -- list ;;
+*) echo "输入无效，已取消操作，原节点不会被修改。"; exit 1 ;;
+esac
 fi
 if locale -a 2>/dev/null | grep -qi '^C\.UTF-8$'; then
 export LANG=C.UTF-8
@@ -59,6 +76,58 @@ progress_percent="$1"
 shift
 printf '\033[1;36m[%3s%%]\033[0m %s\n' "$progress_percent" "$*"
 }
+proxy_lock_dir="/tmp/proxy-script.lock"
+if ! mkdir "$proxy_lock_dir" 2>/dev/null; then
+old_lock_pid=$(cat "$proxy_lock_dir/pid" 2>/dev/null)
+if [ -n "$old_lock_pid" ] && ! kill -0 "$old_lock_pid" 2>/dev/null; then
+rm -rf "$proxy_lock_dir" 2>/dev/null
+mkdir "$proxy_lock_dir" 2>/dev/null || { echo "无法创建脚本运行锁。"; exit 1; }
+else
+echo "检测到另一个脚本任务正在运行，请稍后再试。"
+exit 1
+fi
+fi
+printf '%s\n' "$$" > "$proxy_lock_dir/pid"
+proxy_tmp_files=""
+proxy_cleanup(){
+if [ "${rep_restore_pending:-0}" = 1 ] && [ -d "${rep_backup_dir:-}/agsbx" ]; then
+echo "重建未完成，正在恢复原节点配置。"
+rm -rf "$HOME/agsbx"
+cp -a "$rep_backup_dir/agsbx" "$HOME/agsbx" 2>/dev/null || true
+if [ -d "$rep_backup_dir/systemd" ]; then cp -a "$rep_backup_dir/systemd/." /etc/systemd/system/ 2>/dev/null || true; systemctl daemon-reload >/dev/null 2>&1 || true; systemctl restart xr sb >/dev/null 2>&1 || true; fi
+fi
+for proxy_tmp_file in $proxy_tmp_files; do rm -f "$proxy_tmp_file" 2>/dev/null; done
+[ -n "${rep_backup_dir:-}" ] && rm -rf "$rep_backup_dir" 2>/dev/null || true
+rmdir "$proxy_lock_dir" 2>/dev/null || true
+}
+trap proxy_cleanup EXIT HUP INT TERM
+new_temp_file(){
+proxy_tmp_file=$(mktemp "${TMPDIR:-/tmp}/proxy.XXXXXX") || return 1
+proxy_tmp_files="$proxy_tmp_files $proxy_tmp_file"
+printf '%s\n' "$proxy_tmp_file"
+}
+port_valid(){
+case "$1" in ""|*[!0-9]*) return 1 ;; esac
+[ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null
+}
+port_reserved(){
+candidate_port="$1"
+for port_file in "$HOME"/agsbx/port_* "$HOME/agsbx/subport.log"; do
+[ -f "$port_file" ] || continue
+[ "$(cat "$port_file" 2>/dev/null)" = "$candidate_port" ] && return 0
+done
+ss -lntup 2>/dev/null | grep -Eq "[:.]${candidate_port}[[:space:]]"
+}
+allocate_port(){
+port_tries=0
+while [ "$port_tries" -lt 100 ]; do
+candidate_port=$(shuf -i 10000-65535 -n 1)
+if ! port_reserved "$candidate_port"; then printf '%s\n' "$candidate_port"; return 0; fi
+port_tries=$((port_tries + 1))
+done
+echo "无法找到可用端口。" >&2
+return 1
+}
 repair_dns_if_needed(){
 [ "$1" = "del" ] && return
 if getent hosts api.github.com >/dev/null 2>&1 && getent hosts raw.githubusercontent.com >/dev/null 2>&1; then
@@ -70,21 +139,14 @@ dns_iface=$(ip route 2>/dev/null | awk '/^default /{print $5; exit}')
 if [ -n "$dns_iface" ] && command -v resolvectl >/dev/null 2>&1; then
 resolvectl dns "$dns_iface" 1.1.1.1 8.8.8.8 >/dev/null 2>&1 || true
 resolvectl default-route "$dns_iface" true >/dev/null 2>&1 || true
+else
+echo "DNS 解析异常，且系统没有 resolvectl；为避免破坏系统 DNS，请先检查 /etc/resolv.conf。"
+return 1
 fi
-printf 'options timeout:2 attempts:2 rotate\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf 2>/dev/null || true
 fi
 }
 prepare_apt_noninteractive(){
-if command -v systemctl >/dev/null 2>&1; then
-systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service >/dev/null 2>&1 || true
-systemctl disable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
-fi
-pkill -f 'apt.systemd.daily|unattended-upgrade' >/dev/null 2>&1 || true
-for apt_hook in 20packagekit 50command-not-found 99needrestart 99update-notifier; do
-if [ -f "/etc/apt/apt.conf.d/$apt_hook" ] && [ ! -f "/etc/apt/apt.conf.d/$apt_hook.proxybak" ]; then
-mv "/etc/apt/apt.conf.d/$apt_hook" "/etc/apt/apt.conf.d/$apt_hook.proxybak" 2>/dev/null || true
-fi
-done
+return 0
 }
 apt_run(){
 apt_action="$1"
@@ -199,10 +261,11 @@ if command -v chronyc >/dev/null 2>&1; then
 fi
 EOF
 chmod +x "$HOME/agsbx/sync_time.sh"
-crontab -l 2>/dev/null | sed '/agsbx\/sync_time\.sh/d' > /tmp/agsbx_cron_time.tmp
-echo "*/30 * * * * /bin/sh $HOME/agsbx/sync_time.sh >/dev/null 2>&1" >> /tmp/agsbx_cron_time.tmp
-crontab /tmp/agsbx_cron_time.tmp >/dev/null 2>&1
-rm -f /tmp/agsbx_cron_time.tmp
+new_temp_file || return 1
+cron_tmp="$proxy_tmp_file"
+crontab -l 2>/dev/null | sed '/agsbx\/sync_time\.sh/d' > "$cron_tmp"
+echo "*/30 * * * * /bin/sh $HOME/agsbx/sync_time.sh >/dev/null 2>&1" >> "$cron_tmp"
+crontab "$cron_tmp" >/dev/null 2>&1
 }
 disable_system_firewall(){
 [ "$1" = "del" ] && return
@@ -351,6 +414,23 @@ export ARGO_AUTH=${agk:-''}
 export ippz=${ippz:-''}
 export warp=${warp:-''}
 export name=${name:-''}
+requested_ports=""
+for requested_port in "$port_vl_re" "$port_vm_ws" "$port_vw" "$port_hy2" "$port_tu" "$port_xh" "$port_vx" "$port_an" "$port_ar" "$port_ss" "$port_so"; do
+[ -n "$requested_port" ] || continue
+if ! port_valid "$requested_port"; then echo "协议端口 $requested_port 无效，请输入 1-65535 之间的数字。"; exit 1; fi
+case " $requested_ports " in *" $requested_port "*) echo "多个协议使用了相同端口 $requested_port，请更换后重试。"; exit 1 ;; esac
+requested_ports="$requested_ports $requested_port"
+done
+if [ -n "$ym_vl_re" ] && ! printf '%s' "$ym_vl_re" | grep -Eq '^[A-Za-z0-9.-]+$'; then echo "Reality 域名格式无效。"; exit 1; fi
+if [ -n "$cdnym" ] && ! printf '%s' "$cdnym" | grep -Eq '^[A-Za-z0-9.-]+$'; then echo "CDN 域名格式无效。"; exit 1; fi
+if [ -n "${hyjpt:-}" ]; then
+for jump_port in $hyjpt; do
+case "$jump_port" in
+*:*|*-*) jump_start=$(printf '%s' "$jump_port" | sed 's/[-:].*//'); jump_end=$(printf '%s' "$jump_port" | sed 's/.*[-:]//'); port_valid "$jump_start" && port_valid "$jump_end" && [ "$jump_start" -le "$jump_end" ] 2>/dev/null || { echo "HY2 跳跃端口范围 $jump_port 无效。"; exit 1; } ;;
+*) port_valid "$jump_port" || { echo "HY2 跳跃端口 $jump_port 无效。"; exit 1; } ;;
+esac
+done
+fi
 SCRIPT_GITHUB_USER=${SCRIPT_GITHUB_USER:-zhonglianidc}
 SCRIPT_GITHUB_REPO=${SCRIPT_GITHUB_REPO:-proxy}
 SCRIPT_GITHUB_BRANCH=${SCRIPT_GITHUB_BRANCH:-main}
@@ -393,9 +473,78 @@ if [ "$1" != "del" ]; then
 mkdir -p "$HOME/agsbx"
 [ -f sbx_update ] || touch sbx_update
 fi
+is_valid_ipv4(){
+printf '%s\n' "$1" | awk -F. '
+BEGIN { valid = 1 }
+NF != 4 { valid = 0 }
+{
+  for (i = 1; i <= 4; i++) {
+    if ($i !~ /^[0-9]+$/ || $i < 0 || $i > 255) valid = 0
+  }
+}
+END { exit valid ? 0 : 1 }
+' >/dev/null 2>&1
+}
+is_valid_ipv6(){
+printf '%s\n' "$1" | awk '
+/[^0-9A-Fa-f:]/ || index($0, ":::") || $0 !~ /:/ { exit 1 }
+{
+  value=$0; compressed=gsub(/::/, "::", value)
+  if (compressed > 1) exit 1
+  n=split($0, part, ":")
+  nonempty=0
+  for (i=1; i<=n; i++) {
+    if (length(part[i]) > 4) exit 1
+    if (part[i] != "") nonempty++
+  }
+  if (compressed == 0 && nonempty != 8) exit 1
+  if (compressed == 1 && nonempty >= 8) exit 1
+  if (nonempty < 1) exit 1
+}
+' >/dev/null 2>&1
+}
+is_valid_server_ip(){
+check_ip=${1#\[}
+check_ip=${check_ip%\]}
+is_valid_ipv4 "$check_ip" || is_valid_ipv6 "$check_ip"
+}
+clean_ip_response(){
+printf '%s' "$1" | tr -d '[:space:]' | head -c 64
+}
+fetch_ip_url(){
+ip_family="$1"
+ip_url="$2"
+ip_result=""
+if command -v curl >/dev/null 2>&1; then
+ip_result=$(curl -fsS -"$ip_family" --max-time 4 -k "$ip_url" 2>/dev/null || true)
+elif command -v wget >/dev/null 2>&1; then
+ip_result=$(timeout 5 wget -"$ip_family" --tries=1 -qO- "$ip_url" 2>/dev/null || true)
+fi
+clean_ip_response "$ip_result"
+}
+detect_public_ipv4(){
+for ip_url in https://ipinfo.io/ip https://api.ipify.org https://icanhazip.com https://ifconfig.me/ip; do
+ip_candidate=$(fetch_ip_url 4 "$ip_url")
+if is_valid_ipv4 "$ip_candidate"; then
+printf '%s' "$ip_candidate"
+return 0
+fi
+done
+return 1
+}
+detect_public_ipv6(){
+for ip_url in https://api64.ipify.org https://icanhazip.com https://ifconfig.me/ip; do
+ip_candidate=$(fetch_ip_url 6 "$ip_url")
+if is_valid_ipv6 "$ip_candidate"; then
+printf '%s' "$ip_candidate"
+return 0
+fi
+done
+return 1
+}
 v4v6(){
-v4=$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k "$v46url" 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -4 --tries=2 -qO- "$v46url" 2>/dev/null) )
-v6=$( (command -v curl >/dev/null 2>&1 && curl -s6m5 -k "$v46url" 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 --tries=2 -qO- "$v46url" 2>/dev/null) )
+v4=$(detect_public_ipv4 2>/dev/null || true)
+v6=$(detect_public_ipv6 2>/dev/null || true)
 v4dq=$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k https://myip.ipip.net/ | awk -F'来自于：' '{print $2}' 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -4 --tries=2 -qO- https://myip.ipip.net/ | awk -F'来自于：' '{print $2}' 2>/dev/null) )
 v6dq=$( (command -v curl >/dev/null 2>&1 && curl -s6m5 -k https://ip.fm | sed -n 's/.*Location: //p' 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 --tries=2 -qO- https://ip.fm | grep '<span class="has-text-grey-light">Location:' | tail -n1 | sed -E 's/.*>Location: <\/span>([^<]+)<.*/\1/' 2>/dev/null) )
 }
@@ -507,7 +656,17 @@ fi
 download_file(){
 url="$1"
 out="$2"
-(command -v curl >/dev/null 2>&1 && curl -L -o "$out" -# --retry 2 "$url") || (command -v wget >/dev/null 2>&1 && timeout 120 wget -O "$out" --tries=2 "$url")
+(command -v curl >/dev/null 2>&1 && curl -fL -o "$out" -# --retry 2 --connect-timeout 10 --max-time 180 "$url") || (command -v wget >/dev/null 2>&1 && timeout 180 wget -O "$out" --timeout=20 --tries=2 "$url")
+}
+verify_checksum_file(){
+checksum_file="$1"
+archive_file="$2"
+asset_name="$3"
+expected_hash=$(grep -F "$asset_name" "$checksum_file" 2>/dev/null | grep -Eo '[0-9A-Fa-f]{64}' | head -n 1)
+[ -n "$expected_hash" ] || expected_hash=$(grep -i 'SHA2-256\|SHA256' "$checksum_file" 2>/dev/null | grep -Eo '[0-9A-Fa-f]{64}' | head -n 1)
+[ -n "$expected_hash" ] || return 2
+actual_hash=$(sha256sum "$archive_file" 2>/dev/null | awk '{print $1}')
+[ "$(printf '%s' "$actual_hash" | tr 'A-F' 'a-f')" = "$(printf '%s' "$expected_hash" | tr 'A-F' 'a-f')" ]
 }
 github_latest_tag(){
 repo="$1"
@@ -527,7 +686,7 @@ upxray(){
 case "$cpu" in
 amd64) xray_file='Xray-linux-64.zip' ;;
 arm64) xray_file='Xray-linux-arm64-v8a.zip' ;;
-*) echo "Xray does not support $(uname -m) architecture yet" && exit 1 ;;
+*) echo "Xray does not support $(uname -m) architecture yet"; return 1 ;;
 esac
 xray_tag="$XRAY_VERSION"
 case "$xray_tag" in v*) ;; *) xray_tag="v$xray_tag" ;; esac
@@ -536,11 +695,19 @@ tmpdir="$HOME/agsbx/xray_tmp"
 rm -rf "$tmpdir" && mkdir -p "$tmpdir"
 archive="$tmpdir/xray.zip"
 echo "Downloading pinned official Xray core (${xray_tag}): $url"
-download_file "$url" "$archive" || { echo "Xray download failed"; exit 1; }
-unzip -o -q "$archive" -d "$tmpdir" || { echo "Xray unzip failed"; exit 1; }
-[ -f "$tmpdir/xray" ] || { echo "Xray binary was not found in archive"; exit 1; }
-mv -f "$tmpdir/xray" "$HOME/agsbx/xray"
-chmod +x "$HOME/agsbx/xray"
+download_file "$url" "$archive" || { echo "Xray download failed"; rm -rf "$tmpdir"; return 1; }
+checksum="$tmpdir/xray.dgst"
+if download_file "${url}.dgst" "$checksum" >/dev/null 2>&1; then
+verify_checksum_file "$checksum" "$archive" "$xray_file"; checksum_rc=$?
+[ "$checksum_rc" = 0 ] || { echo "Xray SHA256 checksum validation failed"; rm -rf "$tmpdir"; return 1; }
+else
+echo "Xray checksum file unavailable; continuing with executable validation."
+fi
+unzip -o -q "$archive" -d "$tmpdir" || { echo "Xray unzip failed"; rm -rf "$tmpdir"; return 1; }
+[ -f "$tmpdir/xray" ] || { echo "Xray binary was not found in archive"; rm -rf "$tmpdir"; return 1; }
+chmod +x "$tmpdir/xray"
+"$tmpdir/xray" version >/dev/null 2>&1 || { echo "Xray binary validation failed"; rm -rf "$tmpdir"; return 1; }
+mv -f "$tmpdir/xray" "$HOME/agsbx/xray.new" && mv -f "$HOME/agsbx/xray.new" "$HOME/agsbx/xray" || { rm -rf "$tmpdir"; return 1; }
 rm -rf "$tmpdir"
 sbcore=$("$HOME/agsbx/xray" version 2>/dev/null | awk '/^Xray/{print $2}')
 echo "Installed pinned official Xray core: $sbcore"
@@ -554,25 +721,34 @@ else
 singbox_suffix="linux-${cpu}"
 fi
 ;;
-*) echo "Sing-box does not support $(uname -m) architecture yet" && exit 1 ;;
+*) echo "Sing-box does not support $(uname -m) architecture yet"; return 1 ;;
 esac
-singbox_tag=$(github_latest_tag "SagerNet/sing-box")
-case "$singbox_tag" in v*) ;; *) echo "Failed to get latest Sing-box release tag"; exit 1 ;; esac
+singbox_tag="$SINGBOX_VERSION"
+case "$singbox_tag" in v*) ;; *) singbox_tag="v$singbox_tag" ;; esac
 singbox_version=${singbox_tag#v}
 url="https://github.com/SagerNet/sing-box/releases/download/${singbox_tag}/sing-box-${singbox_version}-${singbox_suffix}.tar.gz"
 tmpdir="$HOME/agsbx/singbox_tmp"
 rm -rf "$tmpdir" && mkdir -p "$tmpdir"
 archive="$tmpdir/sing-box.tar.gz"
-echo "Downloading latest official Sing-box core: $url"
-download_file "$url" "$archive" || { echo "Sing-box download failed"; exit 1; }
-tar -xzf "$archive" -C "$tmpdir" || { echo "Sing-box extract failed"; exit 1; }
+echo "Downloading pinned official Sing-box core (${singbox_tag}): $url"
+download_file "$url" "$archive" || { echo "Sing-box download failed"; rm -rf "$tmpdir"; return 1; }
+checksum="$tmpdir/sing-box-checksums.txt"
+checksum_url="https://github.com/SagerNet/sing-box/releases/download/${singbox_tag}/sing-box-${singbox_version}-checksums.txt"
+if download_file "$checksum_url" "$checksum" >/dev/null 2>&1; then
+verify_checksum_file "$checksum" "$archive" "sing-box-${singbox_version}-${singbox_suffix}.tar.gz"; checksum_rc=$?
+[ "$checksum_rc" = 0 ] || { echo "Sing-box SHA256 checksum validation failed"; rm -rf "$tmpdir"; return 1; }
+else
+echo "Sing-box checksum file unavailable; continuing with executable validation."
+fi
+tar -xzf "$archive" -C "$tmpdir" || { echo "Sing-box extract failed"; rm -rf "$tmpdir"; return 1; }
 bin=$(find "$tmpdir" -type f -name sing-box | head -n 1)
-[ -n "$bin" ] || { echo "Sing-box binary was not found in archive"; exit 1; }
-mv -f "$bin" "$HOME/agsbx/sing-box"
-chmod +x "$HOME/agsbx/sing-box"
+[ -n "$bin" ] || { echo "Sing-box binary was not found in archive"; rm -rf "$tmpdir"; return 1; }
+chmod +x "$bin"
+"$bin" version >/dev/null 2>&1 || { echo "Sing-box binary validation failed"; rm -rf "$tmpdir"; return 1; }
+mv -f "$bin" "$HOME/agsbx/sing-box.new" && mv -f "$HOME/agsbx/sing-box.new" "$HOME/agsbx/sing-box" || { rm -rf "$tmpdir"; return 1; }
 rm -rf "$tmpdir"
 sbcore=$("$HOME/agsbx/sing-box" version 2>/dev/null | awk '/version/{print $NF}')
-echo "Installed latest official Sing-box core: $sbcore"
+echo "Installed pinned official Sing-box core: $sbcore"
 }
 insuuid(){
 if [ -z "$uuid" ] && [ ! -e "$HOME/agsbx/uuid" ]; then
@@ -887,7 +1063,6 @@ echo
 }
 reality_candidates(){
 cat <<EOF
-www.microsoft.com
 www.apple.com
 xp.apple.com
 www.icloud.com
@@ -903,8 +1078,6 @@ www.oracle.com
 www.tesla.com
 addons.mozilla.org
 www.bing.com
-go.microsoft.com
-azure.microsoft.com
 www.xbox.com
 www.lovelive-anime.jp
 EOF
@@ -944,8 +1117,8 @@ if [ -n "$best_domain" ]; then
 echo "Reality优选域名：$best_domain (${best_ms}ms)" >&2
 echo "$best_domain"
 else
-echo "Reality候选域名检测失败，使用默认域名 www.microsoft.com" >&2
-echo "www.microsoft.com"
+echo "Reality候选域名检测失败，使用默认域名 xp.apple.com" >&2
+echo "xp.apple.com"
 fi
 }
 installxray(){
@@ -953,7 +1126,7 @@ echo
 echo "=========启用xray内核========="
 mkdir -p "$HOME/agsbx/xrk"
 if [ ! -e "$HOME/agsbx/xray" ]; then
-upxray
+upxray || return 1
 fi
 cat > "$HOME/agsbx/xr.json" <<EOF
 {
@@ -997,7 +1170,7 @@ fi
 if [ -n "$xhp" ]; then
 xhp=xhpt
 if [ -z "$port_xh" ] && [ ! -e "$HOME/agsbx/port_xh" ]; then
-port_xh=$(shuf -i 10000-65535 -n 1)
+port_xh=$(allocate_port) || exit 1
 echo "$port_xh" > "$HOME/agsbx/port_xh"
 elif [ -n "$port_xh" ]; then
 echo "$port_xh" > "$HOME/agsbx/port_xh"
@@ -1013,8 +1186,7 @@ cat >> "$HOME/agsbx/xr.json" <<EOF
       "settings": {
         "clients": [
           {
-            "id": "${uuid}",
-            "flow": "xtls-rprx-vision"
+            "id": "${uuid}"
           }
         ],
         "decryption": "${dekey}"
@@ -1050,7 +1222,7 @@ fi
 if [ -n "$vxp" ]; then
 vxp=vxpt
 if [ -z "$port_vx" ] && [ ! -e "$HOME/agsbx/port_vx" ]; then
-port_vx=$(shuf -i 10000-65535 -n 1)
+port_vx=$(allocate_port) || exit 1
 echo "$port_vx" > "$HOME/agsbx/port_vx"
 elif [ -n "$port_vx" ]; then
 echo "$port_vx" > "$HOME/agsbx/port_vx"
@@ -1070,8 +1242,7 @@ cat >> "$HOME/agsbx/xr.json" <<EOF
       "settings": {
         "clients": [
           {
-            "id": "${uuid}",
-            "flow": "xtls-rprx-vision"
+            "id": "${uuid}"
           }
         ],
         "decryption": "${dekey}"
@@ -1097,7 +1268,7 @@ fi
 if [ -n "$vwp" ]; then
 vwp=vwpt
 if [ -z "$port_vw" ] && [ ! -e "$HOME/agsbx/port_vw" ]; then
-port_vw=$(shuf -i 10000-65535 -n 1)
+port_vw=$(allocate_port) || exit 1
 echo "$port_vw" > "$HOME/agsbx/port_vw"
 elif [ -n "$port_vw" ]; then
 echo "$port_vw" > "$HOME/agsbx/port_vw"
@@ -1117,8 +1288,7 @@ cat >> "$HOME/agsbx/xr.json" <<EOF
       "settings": {
         "clients": [
           {
-            "id": "${uuid}",
-            "flow": "xtls-rprx-vision"
+            "id": "${uuid}"
           }
         ],
         "decryption": "${dekey}"
@@ -1143,7 +1313,7 @@ if [ -n "$vlp" ]; then
 vlp=vlpt
 echo "$vision" > "$HOME/agsbx/vision_mode"
 if [ -z "$port_vl_re" ] && [ ! -e "$HOME/agsbx/port_vl_re" ]; then
-port_vl_re=$(shuf -i 10000-65535 -n 1)
+port_vl_re=$(allocate_port) || exit 1
 echo "$port_vl_re" > "$HOME/agsbx/port_vl_re"
 elif [ -n "$port_vl_re" ]; then
 echo "$port_vl_re" > "$HOME/agsbx/port_vl_re"
@@ -1193,7 +1363,7 @@ installsb(){
 echo
 echo "=========启用Sing-box内核========="
 if [ ! -e "$HOME/agsbx/sing-box" ]; then
-upsingbox
+upsingbox || return 1
 fi
 cat > "$HOME/agsbx/sb.json" <<EOF
 {
@@ -1201,6 +1371,24 @@ cat > "$HOME/agsbx/sb.json" <<EOF
     "disabled": false,
     "level": "info",
     "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "dns-cloudflare",
+        "server": "1.1.1.1",
+        "server_port": 53
+      },
+      {
+        "type": "udp",
+        "tag": "dns-google",
+        "server": "8.8.8.8",
+        "server_port": 53
+      }
+    ],
+    "final": "dns-cloudflare",
+    "strategy": "prefer_ipv4"
   },
   "inbounds": [
 EOF
@@ -1218,7 +1406,7 @@ fi
 if [ -n "$hyp" ]; then
 hyp=hypt
 if [ -z "$port_hy2" ] && [ ! -e "$HOME/agsbx/port_hy2" ]; then
-port_hy2=$(shuf -i 10000-65535 -n 1)
+port_hy2=$(allocate_port) || exit 1
 echo "$port_hy2" > "$HOME/agsbx/port_hy2"
 elif [ -n "$port_hy2" ]; then
 echo "$port_hy2" > "$HOME/agsbx/port_hy2"
@@ -1253,7 +1441,7 @@ fi
 if [ -n "$tup" ]; then
 tup=tupt
 if [ -z "$port_tu" ] && [ ! -e "$HOME/agsbx/port_tu" ]; then
-port_tu=$(shuf -i 10000-65535 -n 1)
+port_tu=$(allocate_port) || exit 1
 echo "$port_tu" > "$HOME/agsbx/port_tu"
 elif [ -n "$port_tu" ]; then
 echo "$port_tu" > "$HOME/agsbx/port_tu"
@@ -1289,7 +1477,7 @@ fi
 if [ -n "$anp" ]; then
 anp=anpt
 if [ -z "$port_an" ] && [ ! -e "$HOME/agsbx/port_an" ]; then
-port_an=$(shuf -i 10000-65535 -n 1)
+port_an=$(allocate_port) || exit 1
 echo "$port_an" > "$HOME/agsbx/port_an"
 elif [ -n "$port_an" ]; then
 echo "$port_an" > "$HOME/agsbx/port_an"
@@ -1339,7 +1527,7 @@ private_key_s=$(cat "$HOME/agsbx/sbk/private_key")
 public_key_s=$(cat "$HOME/agsbx/sbk/public_key")
 short_id_s=$(cat "$HOME/agsbx/sbk/short_id")
 if [ -z "$port_ar" ] && [ ! -e "$HOME/agsbx/port_ar" ]; then
-port_ar=$(shuf -i 10000-65535 -n 1)
+port_ar=$(allocate_port) || exit 1
 echo "$port_ar" > "$HOME/agsbx/port_ar"
 elif [ -n "$port_ar" ]; then
 echo "$port_ar" > "$HOME/agsbx/port_ar"
@@ -1383,7 +1571,7 @@ sskey=$(tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 16)
 echo "$sskey" > "$HOME/agsbx/sskey"
 fi
 if [ -z "$port_ss" ] && [ ! -e "$HOME/agsbx/port_ss" ]; then
-port_ss=$(shuf -i 10000-65535 -n 1)
+port_ss=$(allocate_port) || exit 1
 echo "$port_ss" > "$HOME/agsbx/port_ss"
 elif [ -n "$port_ss" ]; then
 echo "$port_ss" > "$HOME/agsbx/port_ss"
@@ -1410,7 +1598,7 @@ xrsbvm(){
 if [ -n "$vmp" ]; then
 vmp=vmpt
 if [ -z "$port_vm_ws" ] && [ ! -e "$HOME/agsbx/port_vm_ws" ]; then
-port_vm_ws=$(shuf -i 10000-65535 -n 1)
+port_vm_ws=$(allocate_port) || exit 1
 echo "$port_vm_ws" > "$HOME/agsbx/port_vm_ws"
 elif [ -n "$port_vm_ws" ]; then
 echo "$port_vm_ws" > "$HOME/agsbx/port_vm_ws"
@@ -1480,7 +1668,7 @@ xrsbso(){
 if [ -n "$sop" ]; then
 sop=sopt
 if [ -z "$port_so" ] && [ ! -e "$HOME/agsbx/port_so" ]; then
-port_so=$(shuf -i 10000-65535 -n 1)
+port_so=$(allocate_port) || exit 1
 echo "$port_so" > "$HOME/agsbx/port_so"
 elif [ -n "$port_so" ]; then
 echo "$port_so" > "$HOME/agsbx/port_so"
@@ -1597,6 +1785,11 @@ cat >> "$HOME/agsbx/xr.json" <<EOF
   }
 }
 EOF
+if ! "$HOME/agsbx/xray" run -test -c "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
+echo "Xray 配置检查失败，已停止启动。"
+"$HOME/agsbx/xray" run -test -c "$HOME/agsbx/xr.json"
+return 1
+fi
 if pidof systemd >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/systemd/system/xr.service <<EOF
 [Unit]
@@ -1616,7 +1809,7 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload >/dev/null 2>&1
 systemctl enable xr >/dev/null 2>&1
-systemctl start xr >/dev/null 2>&1
+systemctl start xr >/dev/null 2>&1 || { systemctl status xr --no-pager -l; return 1; }
 elif command -v rc-service >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/init.d/xray <<EOF
 #!/sbin/openrc-run
@@ -1632,7 +1825,7 @@ need net
 EOF
 chmod +x /etc/init.d/xray >/dev/null 2>&1
 rc-update add xray default >/dev/null 2>&1
-rc-service xray start >/dev/null 2>&1
+rc-service xray start >/dev/null 2>&1 || return 1
 else
 nohup "$HOME/agsbx/xray" run -c "$HOME/agsbx/xr.json" >/dev/null 2>&1 &
 fi
@@ -1671,6 +1864,7 @@ cat >> "$HOME/agsbx/sb.json" <<EOF
     }
   ],
   "route": {
+    "default_domain_resolver": "dns-cloudflare",
     "rules": [
        {
           "action": "sniff"
@@ -1688,6 +1882,11 @@ cat >> "$HOME/agsbx/sb.json" <<EOF
   }
 }
 EOF
+if ! "$HOME/agsbx/sing-box" check -c "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
+echo "Sing-box 配置检查失败，已停止启动。"
+"$HOME/agsbx/sing-box" check -c "$HOME/agsbx/sb.json"
+return 1
+fi
 if pidof systemd >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/systemd/system/sb.service <<EOF
 [Unit]
@@ -1707,7 +1906,7 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload >/dev/null 2>&1
 systemctl enable sb >/dev/null 2>&1
-systemctl start sb >/dev/null 2>&1
+systemctl start sb >/dev/null 2>&1 || { systemctl status sb --no-pager -l; return 1; }
 elif command -v rc-service >/dev/null 2>&1 && [ "$(id -u 2>/dev/null)" = "0" ]; then
 cat > /etc/init.d/sing-box <<EOF
 #!/sbin/openrc-run
@@ -1723,7 +1922,7 @@ need net
 EOF
 chmod +x /etc/init.d/sing-box >/dev/null 2>&1
 rc-update add sing-box default >/dev/null 2>&1
-rc-service sing-box start >/dev/null 2>&1
+rc-service sing-box start >/dev/null 2>&1 || return 1
 else
 nohup "$HOME/agsbx/sing-box" run -c "$HOME/agsbx/sb.json" >/dev/null 2>&1 &
 fi
@@ -1733,35 +1932,35 @@ ins(){
 show_progress 42 "开始生成节点核心配置"
 if [ "$hyp" != yes ] && [ "$tup" != yes ] && [ "$anp" != yes ] && [ "$arp" != yes ] && [ "$ssp" != yes ]; then
 show_progress 45 "安装或检查 Xray 内核"
-installxray
+installxray || exit 1
 show_progress 58 "生成 Xray 协议配置"
 xrsbvm
 xrsbso
 show_progress 68 "配置出站和网络分流"
 warpsx
-xrsbout
+xrsbout || exit 1
 hyp="hyptargo"; tup="tuptargo"; anp="anptargo"; arp="arptargo"; ssp="ssptargo"
 elif [ "$xhp" != yes ] && [ "$vlp" != yes ] && [ "$vxp" != yes ] && [ "$vwp" != yes ]; then
 show_progress 45 "安装或检查 Sing-box 内核"
-installsb
+installsb || exit 1
 show_progress 58 "生成 Sing-box 协议配置"
 xrsbvm
 xrsbso
 show_progress 68 "配置出站和网络分流"
 warpsx
-xrsbout
+xrsbout || exit 1
 xhp="xhptargo"; vlp="vlptargo"; vxp="vxptargo"; vwp="vwptargo"
 else
 show_progress 45 "安装或检查 Sing-box 内核"
-installsb
+installsb || exit 1
 show_progress 55 "安装或检查 Xray 内核"
-installxray
+installxray || exit 1
 show_progress 65 "生成协议配置"
 xrsbvm
 xrsbso
 show_progress 72 "配置出站和网络分流"
 warpsx
-xrsbout
+xrsbout || exit 1
 fi
 if [ -n "$argo" ] && [ -n "$vmag" ]; then
 show_progress 76 "配置 Argo 隧道"
@@ -1835,35 +2034,38 @@ sleep 5
 echo
 if find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -Eq 'agsbx/(s|x)' || pgrep -f 'agsbx/(s|x)' >/dev/null 2>&1 ; then
 [ -f ~/.bashrc ] || touch ~/.bashrc
-sed -i '/agsbx/d' ~/.bashrc
-sed -i '/proxy/d' ~/.bashrc
+sed -i '/# proxy-script begin/,/# proxy-script end/d; /检测到系统可能中断过.*一键节点脚本/d; /^export PATH="\$HOME\/bin:\$PATH"$/d' ~/.bashrc
 SCRIPT_PATH="$HOME/bin/proxy"
 mkdir -p "$HOME/bin"
 (command -v curl >/dev/null 2>&1 && curl -sL "$proxyurl" -o "$SCRIPT_PATH") || (command -v wget >/dev/null 2>&1 && wget -qO "$SCRIPT_PATH" "$proxyurl")
 chmod +x "$SCRIPT_PATH"
+echo '# proxy-script begin' >> ~/.bashrc
 if ! pidof systemd >/dev/null 2>&1 && ! command -v rc-service >/dev/null 2>&1; then
 echo "if ! find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -Eq 'agsbx/(s|x)' && ! pgrep -f 'agsbx/(s|x)' >/dev/null 2>&1; then echo '检测到系统可能中断过，或者变量格式错误？建议在SSH对话框输入 reboot 重启下服务器。现在自动执行一键节点脚本的节点恢复操作，请稍等……'; sleep 6; export cfip="${cfip}" hyjpt="${hyjpt}" cdnym="${cdnym}" name="${name}" ippz="${ippz}" argo="${argo}" uuid="${uuid}" $wap="${warp}" $xhp="${port_xh}" $vxp="${port_vx}" $ssp="${port_ss}" $sop="${port_so}" $anp="${port_an}" $arp="${port_ar}" $vlp="${port_vl_re}" $vwp="${port_vw}" $vmp="${port_vm_ws}" $hyp="${port_hy2}" $tup="${port_tu}" reym="${ym_vl_re}" agn="${ARGO_DOMAIN}" agk="${ARGO_AUTH}"; bash "$HOME/bin/proxy"; fi" >> ~/.bashrc
 fi
 sed -i '/export PATH="\$HOME\/bin:\$PATH"/d' ~/.bashrc
 echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
+[ "$(tail -n 1 ~/.bashrc 2>/dev/null)" = '# proxy-script end' ] || echo '# proxy-script end' >> ~/.bashrc
 grep -qxF 'source ~/.bashrc' ~/.bash_profile 2>/dev/null || echo 'source ~/.bashrc' >> ~/.bash_profile
 . ~/.bashrc 2>/dev/null
-crontab -l > /tmp/crontab.tmp 2>/dev/null
+new_temp_file || return 1
+cron_tmp="$proxy_tmp_file"
+crontab -l 2>/dev/null > "$cron_tmp"
 if ! pidof systemd >/dev/null 2>&1 && ! command -v rc-service >/dev/null 2>&1; then
-sed -i '/agsbx\/sing-box/d' /tmp/crontab.tmp
-sed -i '/agsbx\/xray/d' /tmp/crontab.tmp
+sed -i '/agsbx\/sing-box/d' "$cron_tmp"
+sed -i '/agsbx\/xray/d' "$cron_tmp"
 if find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -q 'agsbx/s' || pgrep -f 'agsbx/s' >/dev/null 2>&1 ; then
-echo '@reboot sleep 10 && /bin/sh -c "nohup $HOME/agsbx/sing-box run -c $HOME/agsbx/sb.json >/dev/null 2>&1 &"' >> /tmp/crontab.tmp
+echo '@reboot sleep 10 && /bin/sh -c "nohup $HOME/agsbx/sing-box run -c $HOME/agsbx/sb.json >/dev/null 2>&1 &"' >> "$cron_tmp"
 fi
 if find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -q 'agsbx/x' || pgrep -f 'agsbx/x' >/dev/null 2>&1 ; then
-echo '@reboot sleep 10 && /bin/sh -c "nohup $HOME/agsbx/xray run -c $HOME/agsbx/xr.json >/dev/null 2>&1 &"' >> /tmp/crontab.tmp
+echo '@reboot sleep 10 && /bin/sh -c "nohup $HOME/agsbx/xray run -c $HOME/agsbx/xr.json >/dev/null 2>&1 &"' >> "$cron_tmp"
 fi
 fi
-sed -i '/agsbx\/cloudflared/d' /tmp/crontab.tmp
+sed -i '/agsbx\/cloudflared/d' "$cron_tmp"
 if [ -n "$argo" ] && [ -n "$vmag" ]; then
 if [ -n "${ARGO_DOMAIN}" ] && [ -n "${ARGO_AUTH}" ]; then
 if ! pidof systemd >/dev/null 2>&1 && ! command -v rc-service >/dev/null 2>&1; then
-echo '@reboot sleep 10 && /bin/sh -c "nohup $HOME/agsbx/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token $(cat $HOME/agsbx/sbargotoken.log 2>/dev/null) >/dev/null 2>&1 &"' >> /tmp/crontab.tmp
+echo '@reboot sleep 10 && /bin/sh -c "nohup $HOME/agsbx/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token $(cat $HOME/agsbx/sbargotoken.log 2>/dev/null) >/dev/null 2>&1 &"' >> "$cron_tmp"
 fi
 else
 if command -v apk >/dev/null 2>&1; then
@@ -1877,12 +2079,11 @@ EOF
 chmod +x /etc/local.d/alpineargosbx.start
 rc-update add local default >/dev/null 2>&1
 else
-echo '@reboot sleep 10 && /bin/bash -c "nohup $HOME/agsbx/cloudflared tunnel --url http://localhost:$(cat $HOME/agsbx/argoport.log) --edge-ip-version auto --no-autoupdate --protocol http2 > $HOME/agsbx/argo.log 2>&1 & sleep 10 && bash $HOME/bin/proxy list >/dev/null 2>&1"' >> /tmp/crontab.tmp
+echo '@reboot sleep 10 && /bin/bash -c "nohup $HOME/agsbx/cloudflared tunnel --url http://localhost:$(cat $HOME/agsbx/argoport.log) --edge-ip-version auto --no-autoupdate --protocol http2 > $HOME/agsbx/argo.log 2>&1 & sleep 10 && bash $HOME/bin/proxy list >/dev/null 2>&1"' >> "$cron_tmp"
 fi
 fi
 fi
-crontab /tmp/crontab.tmp >/dev/null 2>&1
-rm /tmp/crontab.tmp
+crontab "$cron_tmp" >/dev/null 2>&1
 echo "一键节点脚本生成" && sleep 2
 else
 echo "一键节点脚本生成" && exit
@@ -1927,8 +2128,20 @@ rm -rf "$HOME/agsbx/qrcodes"
 mkdir -p "$HOME/agsbx/qrcodes"
 chmod 700 "$HOME/agsbx" "$HOME/agsbx/qrcodes" 2>/dev/null || true
 ipbest(){
-serip=$( (command -v curl >/dev/null 2>&1 && (curl -s4m5 -k "$v46url" 2>/dev/null || curl -s6m5 -k "$v46url" 2>/dev/null) ) || (command -v wget >/dev/null 2>&1 && (timeout 3 wget -4 -qO- --tries=2 "$v46url" 2>/dev/null || timeout 3 wget -6 -qO- --tries=2 "$v46url" 2>/dev/null) ) )
-if echo "$serip" | grep -q ':'; then
+serip=$(detect_public_ipv4 2>/dev/null || true)
+[ -n "$serip" ] || serip=$(detect_public_ipv6 2>/dev/null || true)
+if [ -z "$serip" ]; then
+saved_server_ip=$(clean_ip_response "$(cat "$HOME/agsbx/server_ip.log" 2>/dev/null)")
+if is_valid_server_ip "$saved_server_ip"; then
+server_ip="$saved_server_ip"
+echo "公网IP探测暂时失败，继续使用上次保存的有效IP：$server_ip"
+return 0
+fi
+echo "错误：多个公网IP接口均未返回有效地址，已停止生成节点信息。"
+echo "请检查服务器网络或DNS，确认恢复后重新运行 proxy list。"
+return 1
+fi
+if is_valid_ipv6 "$serip"; then
 server_ip="[$serip]"
 echo "$server_ip" > "$HOME/agsbx/server_ip.log"
 else
@@ -1979,23 +2192,23 @@ echo
 sleep 2
 if [ "$ippz" = "4" ]; then
 if [ -z "$v4" ]; then
-ipbest
+ipbest || return 1
 else
 server_ip="$v4"
 echo "$server_ip" > "$HOME/agsbx/server_ip.log"
 fi
 elif [ "$ippz" = "6" ]; then
 if [ -z "$v6" ]; then
-ipbest
+ipbest || return 1
 else
 server_ip="[$v6]"
 echo "$server_ip" > "$HOME/agsbx/server_ip.log"
 fi
 else
-ipbest
+ipbest || return 1
 fi
 }
-ipchange
+ipchange || exit 1
 rm -rf "$HOME/agsbx/jhsub.txt"
 uuid=$(cat "$HOME/agsbx/uuid" 2>/dev/null)
 server_ip=$(cat "$HOME/agsbx/server_ip.log")
@@ -2035,20 +2248,20 @@ fi
 if grep xhttp-reality "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
 print_section "Vless XHTTP Reality ENC"
 port_xh=$(cat "$HOME/agsbx/port_xh")
-vl_xh_link="vless://$uuid@$server_ip:$port_xh?encryption=$enkey&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=xhttp&path=$uuid-xh&mode=auto#$hostname"
+vl_xh_link="vless://$uuid@$server_ip:$port_xh?encryption=$enkey&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key_x&sid=$short_id_x&type=xhttp&path=$uuid-xh&mode=auto#$hostname"
 echo "$vl_xh_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$vl_xh_link" "vless-xhttp-reality"
 fi
 if grep vless-xhttp "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
 print_section "Vless XHTTP ENC"
 port_vx=$(cat "$HOME/agsbx/port_vx")
-vl_vx_link="vless://$uuid@$server_ip:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&path=$uuid-vx&mode=auto#$hostname"
+vl_vx_link="vless://$uuid@$server_ip:$port_vx?encryption=$enkey&type=xhttp&path=$uuid-vx&mode=auto#$hostname"
 echo "$vl_vx_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$vl_vx_link" "vless-xhttp"
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vless XHTTP ENC CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
-vl_vx_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vx?encryption=$enkey&flow=xtls-rprx-vision&type=xhttp&host=$xvvmcdnym&path=$uuid-vx&mode=auto#$hostname"
+vl_vx_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vx?encryption=$enkey&type=xhttp&host=$xvvmcdnym&path=$uuid-vx&mode=auto#$hostname"
 echo "$vl_vx_cdn_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$vl_vx_cdn_link" "vless-xhttp-cdn"
 fi
@@ -2056,13 +2269,13 @@ fi
 if grep vless-ws "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
 print_section "Vless WS ENC"
 port_vw=$(cat "$HOME/agsbx/port_vw")
-vl_vw_link="vless://$uuid@$server_ip:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&path=$uuid-vw#$hostname"
+vl_vw_link="vless://$uuid@$server_ip:$port_vw?encryption=$enkey&type=ws&path=$uuid-vw#$hostname"
 echo "$vl_vw_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$vl_vw_link" "vless-ws"
 if [ -f "$HOME/agsbx/cdnym" ]; then
 print_section "Vless WS ENC CDN"
 echo "Tip: replace cdn*.YOUR_CDN_DOMAIN with your CDN domain if needed."
-vl_vw_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vw?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$xvvmcdnym&path=$uuid-vw#$hostname"
+vl_vw_cdn_link="vless://$uuid@cdn$(cfipsj).YOUR_CDN_DOMAIN:$port_vw?encryption=$enkey&type=ws&host=$xvvmcdnym&path=$uuid-vw#$hostname"
 echo "$vl_vw_cdn_link" >> "$HOME/agsbx/jhsub.txt"
 print_link "节点分享链接：" "$vl_vw_cdn_link" "vless-ws-cdn"
 fi
@@ -2597,9 +2810,9 @@ echo "- \"$clname_argo_tls\""
 echo "- \"$clname_argo\""
 }
 elif [ "$vlvm" = "Vless" ]; then
-vwatls_link1="vless://$uuid@$cdnip1:443?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=tls&sni=$argodomain&fp=chrome&insecure=0#$hostname"
+vwatls_link1="vless://$uuid@$cdnip1:443?encryption=$enkey&type=ws&host=$argodomain&path=$uuid-vw&security=tls&sni=$argodomain&fp=chrome&insecure=0#$hostname"
 echo "$vwatls_link1" >> "$HOME/agsbx/jhsub.txt"
-vwa_link2="vless://$uuid@$cdnip2:80?encryption=$enkey&flow=xtls-rprx-vision&type=ws&host=$argodomain&path=$uuid-vw&security=none#$hostname"
+vwa_link2="vless://$uuid@$cdnip2:80?encryption=$enkey&type=ws&host=$argodomain&path=$uuid-vw&security=none#$hostname"
 echo "$vwa_link2" >> "$HOME/agsbx/jhsub.txt"
 fi
 sbtk=$(cat "$HOME/agsbx/sbargotoken.log" 2>/dev/null)
@@ -3135,17 +3348,12 @@ showmode
 cleandel(){
 for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsbx/c|/agsbx/s|/agsbx/x'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null; fi; fi; done
 kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) $(pgrep -f 'agsbx/c' 2>/dev/null) $(pgrep -f 'agsbx/x' 2>/dev/null) $(pgrep -f 'websbx' 2>/dev/null) >/dev/null 2>&1
-sed -i '/agsbx/d' ~/.bashrc
-sed -i '/proxy/d' ~/.bashrc
-sed -i '/export PATH="\$HOME\/bin:\$PATH"/d' ~/.bashrc
+sed -i '/# proxy-script begin/,/# proxy-script end/d; /检测到系统可能中断过.*一键节点脚本/d; /^export PATH="\$HOME\/bin:\$PATH"$/d; /alias agsbx=/d; /alias proxy=/d' ~/.bashrc
 . ~/.bashrc 2>/dev/null
-crontab -l > /tmp/crontab.tmp 2>/dev/null
-sed -i '/agsbx\/sing-box/d' /tmp/crontab.tmp
-sed -i '/agsbx\/xray/d' /tmp/crontab.tmp
-sed -i '/agsbx\/cloudflared/d' /tmp/crontab.tmp
-sed -i '/websbx/d' /tmp/crontab.tmp
-crontab /tmp/crontab.tmp >/dev/null 2>&1
-rm /tmp/crontab.tmp
+new_temp_file || return 1
+cron_tmp="$proxy_tmp_file"
+crontab -l 2>/dev/null | sed '/agsbx\/sing-box/d; /agsbx\/xray/d; /agsbx\/cloudflared/d; /websbx/d' > "$cron_tmp"
+crontab "$cron_tmp" >/dev/null 2>&1
 rm -rf "$HOME/bin/proxy" "$HOME/bin/agsbx"
 if pidof systemd >/dev/null 2>&1; then
 for svc in xr sb argo; do
@@ -3159,30 +3367,34 @@ rc-service "$svc" stop >/dev/null 2>&1
 rc-update del "$svc" default >/dev/null 2>&1
 done
 rm -rf /etc/init.d/{sing-box,xray,argo} /etc/local.d/alpineargosbx.start /etc/local.d/alpinesubsbx.start
-iptables -t nat -F PREROUTING >/dev/null 2>&1
+remove_hy2_chain
 netfilter-persistent save >/dev/null 2>&1
 rc-service iptables save >/dev/null 2>&1
 rc-service ip6tables save >/dev/null 2>&1
 fi
 }
 xrestart(){
-kill -15 $(pgrep -f 'agsbx/x' 2>/dev/null) >/dev/null 2>&1
 if pidof systemd >/dev/null 2>&1; then
-systemctl restart xr >/dev/null 2>&1
+systemctl restart xr >/dev/null 2>&1 && systemctl is-active --quiet xr
 elif command -v rc-service >/dev/null 2>&1; then
 rc-service xray restart >/dev/null 2>&1
 else
+kill -15 $(pgrep -f 'agsbx/x' 2>/dev/null) >/dev/null 2>&1
 nohup $HOME/agsbx/xray run -c $HOME/agsbx/xr.json >/dev/null 2>&1 &
+sleep 1
+pgrep -f 'agsbx/xray.*xr.json' >/dev/null 2>&1
 fi
 }
 sbrestart(){
-kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) >/dev/null 2>&1
 if pidof systemd >/dev/null 2>&1; then
-systemctl restart sb >/dev/null 2>&1
+systemctl restart sb >/dev/null 2>&1 && systemctl is-active --quiet sb
 elif command -v rc-service >/dev/null 2>&1; then
 rc-service sing-box restart >/dev/null 2>&1
 else
+kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) >/dev/null 2>&1
 nohup $HOME/agsbx/sing-box run -c $HOME/agsbx/sb.json >/dev/null 2>&1 &
+sleep 1
+pgrep -f 'agsbx/sing-box.*sb.json' >/dev/null 2>&1
 fi
 }
 port_read(){
@@ -3224,12 +3436,6 @@ return 1
 fi
 echo "============================================================"
 }
-port_valid(){
-case "$1" in
-""|*[!0-9]*) return 1 ;;
-esac
-[ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null
-}
 port_used_by_other_protocol(){
 new_port="$1"
 skip_file="$2"
@@ -3261,16 +3467,32 @@ if grep -q '"tag"[[:space:]]*:[[:space:]]*"ss"' "$HOME/agsbx/sb.json" 2>/dev/nul
 current_hy2_jump_ports(){
 hy2_now="$1"
 [ -n "$hy2_now" ] || return
-iptables -t nat -nL PREROUTING 2>/dev/null | grep -w "$hy2_now" | awk '{print $8}' | sed 's/dpts://; s/dpt://' | tr ',' ' ' | tr '\n' ' '
+iptables -t nat -nL PROXY_HY2 2>/dev/null | grep -w "$hy2_now" | awk '{print $8}' | sed 's/dpts://; s/dpt://' | tr ',' ' ' | tr '\n' ' '
+}
+prepare_hy2_chain(){
+table_cmd="$1"
+command -v "$table_cmd" >/dev/null 2>&1 || return 0
+"$table_cmd" -t nat -N PROXY_HY2 >/dev/null 2>&1 || true
+"$table_cmd" -t nat -C PREROUTING -j PROXY_HY2 >/dev/null 2>&1 || "$table_cmd" -t nat -A PREROUTING -j PROXY_HY2 >/dev/null 2>&1
+"$table_cmd" -t nat -F PROXY_HY2 >/dev/null 2>&1
+}
+remove_hy2_chain(){
+for table_cmd in iptables ip6tables; do
+command -v "$table_cmd" >/dev/null 2>&1 || continue
+"$table_cmd" -t nat -D PREROUTING -j PROXY_HY2 >/dev/null 2>&1 || true
+"$table_cmd" -t nat -F PROXY_HY2 >/dev/null 2>&1 || true
+"$table_cmd" -t nat -X PROXY_HY2 >/dev/null 2>&1 || true
+done
 }
 refresh_hy2_jump_ports(){
 [ -n "$1" ] || return
 [ -n "$2" ] || return
-iptables -t nat -F PREROUTING >/dev/null 2>&1
-ip6tables -t nat -F PREROUTING >/dev/null 2>&1
+prepare_hy2_chain iptables
+prepare_hy2_chain ip6tables
 for hp in $1; do
-iptables -t nat -A PREROUTING -p udp --dport "$hp" -j DNAT --to-destination :"$2" >/dev/null 2>&1
-ip6tables -t nat -A PREROUTING -p udp --dport "$hp" -j DNAT --to-destination :"$2" >/dev/null 2>&1
+hp=$(printf '%s' "$hp" | tr '-' ':')
+iptables -t nat -A PROXY_HY2 -p udp --dport "$hp" -j DNAT --to-destination :"$2" >/dev/null 2>&1
+command -v ip6tables >/dev/null 2>&1 && ip6tables -t nat -A PROXY_HY2 -p udp --dport "$hp" -j DNAT --to-destination :"$2" >/dev/null 2>&1
 done
 netfilter-persistent save >/dev/null 2>&1
 rc-service iptables save >/dev/null 2>&1
@@ -3282,43 +3504,51 @@ changed_file="$1"
 new_port="$2"
 old_hy2_port=$(port_read port_hy2)
 hy2_jump_ports=$(current_hy2_jump_ports "$old_hy2_port")
+port_backup_dir=$(mktemp -d "${TMPDIR:-/tmp}/proxy-port.XXXXXX") || return 1
+cp -p "$HOME/agsbx/$changed_file" "$port_backup_dir/port.old" 2>/dev/null || true
+cp -p "$HOME/agsbx/xr.json" "$port_backup_dir/xr.json" 2>/dev/null || true
+cp -p "$HOME/agsbx/sb.json" "$port_backup_dir/sb.json" 2>/dev/null || true
 echo "$new_port" > "$HOME/agsbx/$changed_file"
 ym_vl_re=$(cat "$HOME/agsbx/ym_vl_re" 2>/dev/null)
 cdnym=$(cat "$HOME/agsbx/cdnym" 2>/dev/null)
-if pidof systemd >/dev/null 2>&1; then
-systemctl stop xr sb >/dev/null 2>&1
-elif command -v rc-service >/dev/null 2>&1; then
-rc-service xray stop >/dev/null 2>&1
-rc-service sing-box stop >/dev/null 2>&1
-else
-kill -15 $(pgrep -f 'agsbx/x' 2>/dev/null) $(pgrep -f 'agsbx/s' 2>/dev/null) >/dev/null 2>&1
-fi
 rm -f "$HOME/agsbx/xr.json" "$HOME/agsbx/sb.json"
+build_ok=yes
 if [ "$old_has_singbox" = no ]; then
 installxray
 xrsbvm
 xrsbso
 warpsx
-xrsbout
+xrsbout || build_ok=no
 elif [ "$old_has_xray" = no ]; then
 installsb
 xrsbvm
 xrsbso
 warpsx
-xrsbout
+xrsbout || build_ok=no
 else
 installsb
 installxray
 xrsbvm
 xrsbso
 warpsx
-xrsbout
+xrsbout || build_ok=no
+fi
+if [ "$build_ok" != yes ]; then
+echo "新端口配置生成失败，正在恢复原配置。"
+[ -f "$port_backup_dir/port.old" ] && cp -p "$port_backup_dir/port.old" "$HOME/agsbx/$changed_file"
+[ -f "$port_backup_dir/xr.json" ] && cp -p "$port_backup_dir/xr.json" "$HOME/agsbx/xr.json"
+[ -f "$port_backup_dir/sb.json" ] && cp -p "$port_backup_dir/sb.json" "$HOME/agsbx/sb.json"
+[ "$old_has_xray" = yes ] && xrestart >/dev/null 2>&1 || true
+[ "$old_has_singbox" = yes ] && sbrestart >/dev/null 2>&1 || true
+rm -rf "$port_backup_dir"
+return 1
 fi
 if [ "$changed_file" = "port_hy2" ] && [ -n "$hy2_jump_ports" ]; then
 refresh_hy2_jump_ports "$hy2_jump_ports" "$new_port"
 fi
-xrestart
-sbrestart
+if [ "$old_has_xray" = yes ]; then xrestart || { echo "Xray 重启失败，已保留诊断信息。"; rm -rf "$port_backup_dir"; return 1; }; fi
+if [ "$old_has_singbox" = yes ]; then sbrestart || { echo "Sing-box 重启失败，已保留诊断信息。"; rm -rf "$port_backup_dir"; return 1; }; fi
+rm -rf "$port_backup_dir"
 sleep 2
 cip
 }
@@ -3358,7 +3588,7 @@ echo "端口 $new_port 当前已被系统占用，请换一个端口。"
 exit 1
 fi
 echo "正在将 $selected_name 端口从 $old_port 修改为 $new_port，请稍等..."
-rebuild_after_port_change "$selected_file" "$new_port"
+rebuild_after_port_change "$selected_file" "$new_port" || { echo "端口修改失败，已停止后续操作。"; exit 1; }
 echo
 echo "端口修改完成：$selected_name $old_port -> $new_port"
 echo "节点分享链接、二维码汇总网页和 Clash/Mihomo 订阅已同步更新。"
@@ -3373,7 +3603,11 @@ echo "欢迎继续使用一键节点脚本生成" && sleep 2
 echo
 showmode
 exit
-elif [ "$1" = "rep" ] || { [ -z "$1" ] && [ "$protocol_requested" = yes ] && { find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -Eq 'agsbx/(s|x)' || pgrep -f 'agsbx/(s|x)' >/dev/null 2>&1; }; }; then
+elif [ "$1" = "rep" ] || [ "$PROXY_EXISTING_REBUILD" = 1 ]; then
+rep_backup_dir=$(mktemp -d "${TMPDIR:-/tmp}/proxy-rep.XXXXXX") || exit 1
+[ -d "$HOME/agsbx" ] && cp -a "$HOME/agsbx" "$rep_backup_dir/agsbx"
+if pidof systemd >/dev/null 2>&1; then mkdir -p "$rep_backup_dir/systemd"; cp -p /etc/systemd/system/xr.service /etc/systemd/system/sb.service "$rep_backup_dir/systemd/" 2>/dev/null || true; fi
+rep_restore_pending=1
 cleandel
 rm -rf "$HOME/agsbx"/{sb.json,xr.json,sbargoym.log,sbargotoken.log,argo.log,argoport.log,cdnym,name}
 echo "一键节点脚本生成" && sleep 2
@@ -3385,14 +3619,26 @@ elif [ "$1" = "port" ]; then
 change_node_port
 exit
 elif [ "$1" = "upx" ]; then
-for P in /proc/[0-9]*; do [ -L "$P/exe" ] || continue; TARGET=$(readlink -f "$P/exe" 2>/dev/null) || continue; case "$TARGET" in *"/agsbx/x"*) kill "$(basename "$P")" 2>/dev/null ;; esac; done
-kill -15 $(pgrep -f 'agsbx/x' 2>/dev/null) >/dev/null 2>&1
-upxray && xrestart && echo "Xray内核更新完成" && sleep 2 && cip
+[ -x "$HOME/agsbx/xray" ] && cp -p "$HOME/agsbx/xray" "$HOME/agsbx/xray.rollback"
+if upxray && { [ ! -f "$HOME/agsbx/xr.json" ] || "$HOME/agsbx/xray" run -test -c "$HOME/agsbx/xr.json" >/dev/null 2>&1; } && xrestart; then
+rm -f "$HOME/agsbx/xray.rollback"
+echo "Xray内核更新完成"; sleep 2; cip
+else
+echo "Xray更新或重启失败，正在恢复旧内核。"
+if [ -f "$HOME/agsbx/xray.rollback" ]; then mv -f "$HOME/agsbx/xray.rollback" "$HOME/agsbx/xray"; chmod +x "$HOME/agsbx/xray"; xrestart || true; fi
+exit 1
+fi
 exit
 elif [ "$1" = "ups" ]; then
-for P in /proc/[0-9]*; do [ -L "$P/exe" ] || continue; TARGET=$(readlink -f "$P/exe" 2>/dev/null) || continue; case "$TARGET" in *"/agsbx/s"*) kill "$(basename "$P")" 2>/dev/null ;; esac; done
-kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) >/dev/null 2>&1
-upsingbox && sbrestart && echo "Sing-box内核更新完成" && sleep 2 && cip
+[ -x "$HOME/agsbx/sing-box" ] && cp -p "$HOME/agsbx/sing-box" "$HOME/agsbx/sing-box.rollback"
+if upsingbox && { [ ! -f "$HOME/agsbx/sb.json" ] || "$HOME/agsbx/sing-box" check -c "$HOME/agsbx/sb.json" >/dev/null 2>&1; } && sbrestart; then
+rm -f "$HOME/agsbx/sing-box.rollback"
+echo "Sing-box内核更新完成"; sleep 2; cip
+else
+echo "Sing-box更新或重启失败，正在恢复旧内核。"
+if [ -f "$HOME/agsbx/sing-box.rollback" ]; then mv -f "$HOME/agsbx/sing-box.rollback" "$HOME/agsbx/sing-box"; chmod +x "$HOME/agsbx/sing-box"; sbrestart || true; fi
+exit 1
+fi
 exit
 elif [ "$1" = "res" ]; then
 for P in /proc/[0-9]*; do
@@ -3431,7 +3677,7 @@ if ! find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -
 for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsbx/c|/agsbx/s|/agsbx/x'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null && echo "Killed $PID ($TARGET)" || echo "Could not kill $PID ($TARGET)"; fi; fi; done
 kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) $(pgrep -f 'agsbx/c' 2>/dev/null) $(pgrep -f 'agsbx/x' 2>/dev/null) >/dev/null 2>&1
 if [ -z "$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k "$v46url" 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -4 -qO- --tries=2 "$v46url" 2>/dev/null) )" ]; then
-printf 'options timeout:2 attempts:2 rotate\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf
+repair_dns_if_needed "$1" || true
 fi
 if [ -n "$( (command -v curl >/dev/null 2>&1 && curl -s6m5 -k "$v46url" 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 -qO- --tries=2 "$v46url" 2>/dev/null) )" ]; then
 sendip="2606:4700:d0::a29f:c001"
@@ -3475,12 +3721,25 @@ if [ -z "$subpt" ]; then
 if [ -n "$(cat "$HOME/agsbx/subport.log" 2>/dev/null)" ]; then
 subport=$(cat $HOME/agsbx/subport.log)
 else
-subport=$(shuf -i 10000-65535 -n 1)
+subport=$(allocate_port) || exit 1
 fi
 else
 subport="$subpt"
 fi
-echo $subport > $HOME/agsbx/subport.log
+if ! port_valid "$subport"; then
+echo "订阅端口必须是 1-65535 之间的数字。"
+exit 1
+fi
+old_subport=$(cat "$HOME/agsbx/subport.log" 2>/dev/null)
+if port_used_by_other_protocol "$subport" "subport.log"; then
+echo "订阅端口 $subport 已被节点协议使用。"
+exit 1
+fi
+if [ "$subport" != "$old_subport" ] && ss -lntup 2>/dev/null | grep -Eq "[:.]${subport}[[:space:]]"; then
+echo "订阅端口 $subport 已被系统其他程序占用。"
+exit 1
+fi
+echo "$subport" > "$HOME/agsbx/subport.log"
 }
 subtokenipsub && subportipsub
 echo "请稍后…………"
@@ -3497,6 +3756,10 @@ else
 busybox httpd -f -p "$(cat $HOME/agsbx/subport.log 2>/dev/null)" -h $HOME/websbx > /dev/null 2>&1 &
 fi
 sleep 5
+if ! ss -lntp 2>/dev/null | grep -Eq "[:.]$(cat "$HOME/agsbx/subport.log")[[:space:]]"; then
+echo "订阅网页服务启动失败，端口未监听。"
+exit 1
+fi
 if command -v apk >/dev/null 2>&1; then
 cat > /etc/local.d/alpinesubsbx.start <<EOF
 #!/bin/bash
@@ -3506,11 +3769,11 @@ EOF
 chmod +x /etc/local.d/alpinesubsbx.start
 rc-update add local default >/dev/null 2>&1
 else
-crontab -l 2>/dev/null > /tmp/crontab.tmp
-sed -i '/websbx/d' /tmp/crontab.tmp
-echo '@reboot sleep 10 && /bin/bash -c "busybox httpd -f -p $(cat $HOME/agsbx/subport.log 2>/dev/null) -h $HOME/websbx > /dev/null 2>&1 &"' >> /tmp/crontab.tmp
-crontab /tmp/crontab.tmp >/dev/null 2>&1
-rm /tmp/crontab.tmp
+new_temp_file || exit 1
+cron_tmp="$proxy_tmp_file"
+crontab -l 2>/dev/null | sed '/websbx/d' > "$cron_tmp"
+echo '@reboot sleep 10 && /bin/bash -c "busybox httpd -f -p $(cat $HOME/agsbx/subport.log 2>/dev/null) -h $HOME/websbx > /dev/null 2>&1 &"' >> "$cron_tmp"
+crontab "$cron_tmp" >/dev/null 2>&1
 fi
 echo "本地IP订阅链接已更新完成"
 fi
@@ -3518,13 +3781,8 @@ if [ -n "$hyjpt" ] && [ -n "$hyp" ]; then
 show_progress 88 "配置 Hysteria2 跳跃端口"
 echo
 echo "设置Hysteria2协议的跳跃端口：$hyjpt"
-iptables -t nat -F PREROUTING >/dev/null 2>&1
-ip6tables -t nat -F PREROUTING >/dev/null 2>&1
 hyport=$(cat "$HOME/agsbx/port_hy2")
-for port in $hyjpt; do
-iptables -t nat -A PREROUTING -p udp --dport "$port" -j DNAT --to-destination :$hyport
-ip6tables -t nat -A PREROUTING -p udp --dport "$port" -j DNAT --to-destination :$hyport
-done
+refresh_hy2_jump_ports "$hyjpt" "$hyport"
 netfilter-persistent save >/dev/null 2>&1
 if command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
 rc-update show default 2>/dev/null | grep -q 'iptables' || rc-update add iptables >/dev/null 2>&1
@@ -3536,6 +3794,7 @@ fi
 show_progress 92 "整理节点分享链接和汇总网页"
 cip
 show_progress 100 "安装完成"
+rep_restore_pending=0
 echo
 else
 echo "一键节点脚本生成"
