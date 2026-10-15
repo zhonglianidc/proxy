@@ -1,5 +1,5 @@
 #!/bin/sh
-SCRIPT_VERSION=${SCRIPT_VERSION:-v1.2.4-20261007}
+SCRIPT_VERSION=${SCRIPT_VERSION:-v1.2.5-20261015}
 XRAY_VERSION=${XRAY_VERSION:-v26.3.27}
 SINGBOX_VERSION=${SINGBOX_VERSION:-v1.13.16}
 PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh}
@@ -3201,14 +3201,14 @@ proxies:
 $clxy
 
 proxy-groups:
-- name: 🚀 节点选择
+- name: "节点选择"
   type: select
   proxies:
-    - ⚡ 自动选择
+    - "自动选择"
     $clgz
     - DIRECT
     - REJECT
-- name: ⚡ 自动选择
+- name: "自动选择"
   type: url-test
   url: https://www.gstatic.com/generate_204
   interval: 300
@@ -3216,95 +3216,95 @@ proxy-groups:
   tolerance: 50
   proxies:
     $clgz 
-- name: 💬 AI 服务
+- name: "AI服务"
   type: select
   proxies:
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - DIRECT
     - REJECT
-- name: 📹 油管视频
+- name: "油管视频"
   type: select
   proxies:
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - DIRECT
     - REJECT
-- name: 🔍 谷歌服务
+- name: "谷歌服务"
   type: select
   proxies:
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - DIRECT
     - REJECT
-- name: 🐱 Github
+- name: "GitHub"
   type: select
   proxies:
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - DIRECT
     - REJECT
-- name: 🌐 社交媒体
+- name: "社交媒体"
   type: select
   proxies:
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - DIRECT
     - REJECT
-- name: 📲 电报消息
+- name: "电报消息"
   type: select
   proxies:
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - DIRECT
     - REJECT
-- name: 🏠 私有网络
+- name: "私有网络"
   type: select
   proxies:
     - DIRECT
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - REJECT
-- name: 🔒 国内服务
+- name: "国内服务"
   type: select
   proxies:
     - DIRECT
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - REJECT
-- name: 🌐 非中国
+- name: "非中国"
   type: select
   proxies:
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - DIRECT
     - REJECT
-- name: 🐟 漏网之鱼
+- name: "漏网之鱼"
   type: select
   proxies:
-    - 🚀 节点选择
+    - "节点选择"
     $clgz
     - DIRECT
     - REJECT
 rules:
-  - RULE-SET,category-ai-!cn,💬 AI 服务
-  - RULE-SET,youtube,📹 油管视频
-  - RULE-SET,google,🔍 谷歌服务
-  - RULE-SET,github,🐱 Github
-  - RULE-SET,gitlab,🐱 Github
-  - RULE-SET,facebook,🌐 社交媒体
-  - RULE-SET,instagram,🌐 社交媒体
-  - RULE-SET,twitter,🌐 社交媒体
-  - RULE-SET,tiktok,🌐 社交媒体
-  - RULE-SET,linkedin,🌐 社交媒体
-  - RULE-SET,telegram-ip,📲 电报消息,no-resolve
-  - RULE-SET,private-ip,🏠 私有网络,no-resolve
-  - RULE-SET,geolocation-cn,🔒 国内服务
-  - RULE-SET,cn,🔒 国内服务
-  - RULE-SET,cn-ip,🔒 国内服务,no-resolve
-  - RULE-SET,geolocation-!cn,🌐 非中国
-  - RULE-SET,google-ip,🔍 谷歌服务,no-resolve
-  - MATCH,🐟 漏网之鱼
+  - RULE-SET,category-ai-!cn,AI服务
+  - RULE-SET,youtube,油管视频
+  - RULE-SET,google,谷歌服务
+  - RULE-SET,github,GitHub
+  - RULE-SET,gitlab,GitHub
+  - RULE-SET,facebook,社交媒体
+  - RULE-SET,instagram,社交媒体
+  - RULE-SET,twitter,社交媒体
+  - RULE-SET,tiktok,社交媒体
+  - RULE-SET,linkedin,社交媒体
+  - RULE-SET,telegram-ip,电报消息,no-resolve
+  - RULE-SET,private-ip,私有网络,no-resolve
+  - RULE-SET,geolocation-cn,国内服务
+  - RULE-SET,cn,国内服务
+  - RULE-SET,cn-ip,国内服务,no-resolve
+  - RULE-SET,geolocation-!cn,非中国
+  - RULE-SET,google-ip,谷歌服务,no-resolve
+  - MATCH,漏网之鱼
 EOF
 echo "---------------------------------------------------------"
 echo "$argoshow"
