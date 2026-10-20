@@ -1,5 +1,5 @@
 #!/bin/sh
-SCRIPT_VERSION=${SCRIPT_VERSION:-v1.2.5-20261015}
+SCRIPT_VERSION=${SCRIPT_VERSION:-v1.2.8-20261021}
 XRAY_VERSION=${XRAY_VERSION:-v26.3.27}
 SINGBOX_VERSION=${SINGBOX_VERSION:-v1.13.16}
 PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh}
@@ -161,6 +161,109 @@ else
 apt-get -o DPkg::Lock::Timeout=60 -o APT::Update::Post-Invoke-Success::= -o DPkg::Post-Invoke::= "$@" </dev/null
 fi
 }
+detect_apt_region(){
+apt_country_code=""
+if command -v curl >/dev/null 2>&1; then
+apt_country_code=$(curl -fsS -k --max-time 4 https://ipinfo.io/country 2>/dev/null | tr -d '\r\n' | tr '[:lower:]' '[:upper:]')
+elif command -v wget >/dev/null 2>&1; then
+if command -v timeout >/dev/null 2>&1; then
+apt_country_code=$(timeout 6 wget --no-check-certificate -qO- https://ipinfo.io/country 2>/dev/null | tr -d '\r\n' | tr '[:lower:]' '[:upper:]')
+else
+apt_country_code=$(wget --no-check-certificate -qO- https://ipinfo.io/country 2>/dev/null | tr -d '\r\n' | tr '[:lower:]' '[:upper:]')
+fi
+fi
+case "$apt_country_code" in ??) ;; *) apt_country_code="" ;; esac
+case " $apt_country_code " in
+" CN ") apt_region="中国大陆" ;;
+*" JP "*|*" KR "*|*" SG "*|*" HK "*|*" TW "*|*" MY "*|*" TH "*|*" ID "*|*" PH "*|*" VN "*|*" IN "*) apt_region="亚洲" ;;
+*" DE "*|*" FR "*|*" GB "*|*" NL "*|*" IT "*|*" ES "*|*" PT "*|*" BE "*|*" CH "*|*" AT "*|*" PL "*|*" CZ "*|*" SE "*|*" NO "*|*" FI "*|*" DK "*|*" IE "*|*" GR "*|*" RO "*|*" BG "*|*" HU "*|*" UA "*|*" RU "*) apt_region="欧洲" ;;
+*" US "*|*" CA "*|*" MX "*) apt_region="北美洲" ;;
+*" AU "*|*" NZ "*) apt_region="大洋洲" ;;
+*) apt_region="全球" ;;
+esac
+}
+prepare_apt_fallback_sources(){
+apt_fallback_file="${TMPDIR:-/tmp}/proxy-apt-sources.$$"
+os_id=""
+os_codename=""
+if [ -r /etc/os-release ]; then
+os_id=$(sed -n 's/^ID=["'"']\{0,1\}\([^"'"']*\)["'"']\{0,1\}$/\1/p' /etc/os-release | head -n 1)
+os_codename=$(sed -n 's/^VERSION_CODENAME=["'"']\{0,1\}\([^"'"']*\)["'"']\{0,1\}$/\1/p' /etc/os-release | head -n 1)
+[ -n "$os_codename" ] || os_codename=$(sed -n 's/^UBUNTU_CODENAME=["'"']\{0,1\}\([^"'"']*\)["'"']\{0,1\}$/\1/p' /etc/os-release | head -n 1)
+fi
+detect_apt_region
+debian_mirror="http://deb.debian.org/debian"
+debian_security_mirror="http://security.debian.org/debian-security"
+ubuntu_mirror="http://archive.ubuntu.com/ubuntu"
+case "$apt_region" in
+中国大陆)
+debian_mirror="http://mirrors.aliyun.com/debian"
+debian_security_mirror="http://mirrors.aliyun.com/debian-security"
+ubuntu_mirror="http://mirrors.aliyun.com/ubuntu"
+;;
+亚洲) debian_mirror="http://ftp.jp.debian.org/debian"; ubuntu_mirror="http://jp.archive.ubuntu.com/ubuntu" ;;
+欧洲) debian_mirror="http://ftp.de.debian.org/debian"; ubuntu_mirror="http://de.archive.ubuntu.com/ubuntu" ;;
+北美洲) debian_mirror="http://ftp.us.debian.org/debian"; ubuntu_mirror="http://us.archive.ubuntu.com/ubuntu" ;;
+大洋洲) debian_mirror="http://ftp.au.debian.org/debian"; ubuntu_mirror="http://au.archive.ubuntu.com/ubuntu" ;;
+esac
+case "$os_id:$os_codename" in
+debian:*)
+[ -n "$os_codename" ] || return 1
+cat > "$apt_fallback_file" <<EOF
+deb $debian_mirror $os_codename main contrib non-free non-free-firmware
+deb $debian_mirror $os_codename-updates main contrib non-free non-free-firmware
+deb $debian_security_mirror $os_codename-security main contrib non-free non-free-firmware
+EOF
+;;
+ubuntu:*)
+[ -n "$os_codename" ] || return 1
+ubuntu_arch=$(dpkg --print-architecture 2>/dev/null || uname -m 2>/dev/null)
+case "$ubuntu_arch" in amd64|i386|x86_64|i686) ;; *) ubuntu_mirror="http://ports.ubuntu.com/ubuntu-ports" ;; esac
+cat > "$apt_fallback_file" <<EOF
+deb $ubuntu_mirror $os_codename main restricted universe multiverse
+deb $ubuntu_mirror $os_codename-updates main restricted universe multiverse
+deb $ubuntu_mirror $os_codename-security main restricted universe multiverse
+EOF
+;;
+*) return 1 ;;
+esac
+echo "检测到服务器区域：$apt_region${apt_country_code:+（$apt_country_code）}，备用软件源：$(sed -n '1s/^deb \([^ ]*\).*/\1/p' "$apt_fallback_file")"
+proxy_tmp_files="$proxy_tmp_files $apt_fallback_file"
+apt_use_fallback=1
+return 0
+}
+apt_with_sources(){
+apt_with_sources_timeout="$1"
+shift
+if [ "${apt_use_fallback:-0}" = 1 ]; then
+apt_run "$apt_with_sources_timeout" -o Dir::Etc::sourcelist="$apt_fallback_file" -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0 "$@"
+else
+apt_run "$apt_with_sources_timeout" "$@"
+fi
+}
+refresh_apt_sources(){
+apt_use_fallback=0
+apt_update_log=$(new_temp_file) || return 1
+if apt_run 180 update -y >"$apt_update_log" 2>&1; then
+return 0
+fi
+echo "当前软件源刷新失败，正在清理缓存后重试..."
+apt-get clean >/dev/null 2>&1 || true
+rm -rf /var/lib/apt/lists/partial 2>/dev/null || true
+mkdir -p /var/lib/apt/lists/partial 2>/dev/null || true
+if apt_run 180 update -y >"$apt_update_log" 2>&1; then
+return 0
+fi
+if prepare_apt_fallback_sources; then
+echo "原软件源仍不可用，临时使用系统对应的官方备用源安装依赖。"
+if apt_with_sources 180 update -y >"$apt_update_log" 2>&1; then
+return 0
+fi
+fi
+echo "软件源刷新失败，最后一条错误信息："
+tail -n 3 "$apt_update_log" 2>/dev/null || true
+return 1
+}
 apt_lists_fresh(){
 apt_update_skip_seconds=${APT_UPDATE_SKIP_SECONDS:-43200}
 now_ts=$(date +%s 2>/dev/null || echo 0)
@@ -191,17 +294,24 @@ if command -v apt-get >/dev/null 2>&1; then
 export DEBIAN_FRONTEND=noninteractive
 prepare_apt_noninteractive
 show_progress 8 "刷新系统软件源"
+apt_use_fallback=0
 if apt_lists_fresh; then
 echo "系统软件源 12 小时内已刷新，跳过 apt-get update。"
 else
-apt_run 180 update -y >/dev/null 2>&1 || echo "apt-get update 超时或失败，继续尝试安装基础依赖..."
+refresh_apt_sources || echo "软件源暂时不可用，继续使用现有软件包索引尝试安装..."
 fi
 printf 'iptables-persistent iptables-persistent/autosave_v4 boolean true\niptables-persistent iptables-persistent/autosave_v6 boolean true\n' | debconf-set-selections 2>/dev/null
 show_progress 15 "安装基础依赖包"
-apt_run 300 install -y --no-install-recommends --no-upgrade curl wget ca-certificates bash coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus >/dev/null 2>&1
+apt_base_packages="curl wget ca-certificates bash coreutils util-linux procps iproute2 iptables cron openssl unzip tar gzip findutils grep sed gawk xz-utils dbus"
+if ! apt_with_sources 300 install -y --no-install-recommends --no-upgrade $apt_base_packages >/dev/null 2>&1; then
+if [ "${apt_use_fallback:-0}" != 1 ] && prepare_apt_fallback_sources && apt_with_sources 180 update -y >/dev/null 2>&1; then
+echo "原软件源无法安装依赖，已切换临时官方备用源重试。"
+apt_with_sources 300 install -y --no-install-recommends --no-upgrade $apt_base_packages >/dev/null 2>&1 || true
+fi
+fi
 show_progress 22 "检查节点汇总页和订阅服务组件"
-command -v busybox >/dev/null 2>&1 || apt_run 180 install -y --no-install-recommends --no-upgrade busybox-static >/dev/null 2>&1 || true
-command -v qrencode >/dev/null 2>&1 || apt_run 180 install -y --no-install-recommends --no-upgrade qrencode >/dev/null 2>&1 || true
+command -v busybox >/dev/null 2>&1 || apt_with_sources 180 install -y --no-install-recommends --no-upgrade busybox-static >/dev/null 2>&1 || true
+command -v qrencode >/dev/null 2>&1 || apt_with_sources 180 install -y --no-install-recommends --no-upgrade qrencode >/dev/null 2>&1 || true
 elif command -v apk >/dev/null 2>&1; then
 apk update >/dev/null 2>&1
 apk add --no-cache curl wget ca-certificates bash busybox-extras gcompat libc6-compat coreutils util-linux procps iproute2 iptables ip6tables openrc dcron openssl unzip tar gzip findutils grep sed gawk xz >/dev/null 2>&1
@@ -3569,6 +3679,19 @@ fi
 selected_name=$(printf '%s' "$selected_line" | cut -d'|' -f2)
 selected_file=$(printf '%s' "$selected_line" | cut -d'|' -f3)
 old_port=$(port_read "$selected_file")
+echo
+echo "请选择 $selected_name 的端口更换方式："
+echo "  1. 随机更换为新的可用端口（默认）"
+echo "  2. 输入指定端口"
+printf '请输入选项 [1]：'
+read port_change_mode
+[ -n "$port_change_mode" ] || port_change_mode=1
+case "$port_change_mode" in
+1)
+new_port=$(allocate_port) || exit 1
+echo "已随机选择新端口：$new_port"
+;;
+2)
 printf '请输入 %s 的新端口：' "$selected_name"
 read new_port
 if ! port_valid "$new_port"; then
@@ -3587,6 +3710,12 @@ if ss -lntup 2>/dev/null | grep -Eq "[:.]${new_port}[[:space:]]"; then
 echo "端口 $new_port 当前已被系统占用，请换一个端口。"
 exit 1
 fi
+;;
+*)
+echo "选择无效，已取消。"
+exit 1
+;;
+esac
 echo "正在将 $selected_name 端口从 $old_port 修改为 $new_port，请稍等..."
 rebuild_after_port_change "$selected_file" "$new_port" || { echo "端口修改失败，已停止后续操作。"; exit 1; }
 echo
