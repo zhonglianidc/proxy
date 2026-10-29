@@ -1,5 +1,5 @@
 #!/bin/sh
-SCRIPT_VERSION=${SCRIPT_VERSION:-v1.2.8-20261021}
+SCRIPT_VERSION=${SCRIPT_VERSION:-v1.2.9-20261029}
 XRAY_VERSION=${XRAY_VERSION:-v26.3.27}
 SINGBOX_VERSION=${SINGBOX_VERSION:-v1.13.16}
 PROXY_SCRIPT_URL=${PROXY_SCRIPT_URL:-https://raw.githubusercontent.com/zhonglianidc/proxy/main/proxy.sh}
@@ -32,7 +32,26 @@ echo "当前环境非root用户权限，请先输入 sudo -i 命令"
 exit 1
 fi
 PROXY_EXISTING_REBUILD=0
-if [ -z "$1" ] && [ -n "${PROXY_SELECTED_KEYS# }" ] && { [ -s "$HOME/agsbx/xr.json" ] || [ -s "$HOME/agsbx/sb.json" ]; }; then
+proxy_existing_config=0
+proxy_existing_valid=1
+if [ -s "$HOME/agsbx/xr.json" ]; then
+proxy_existing_config=1
+if [ ! -x "$HOME/agsbx/xray" ] || ! "$HOME/agsbx/xray" run -test -c "$HOME/agsbx/xr.json" >/dev/null 2>&1; then
+proxy_existing_valid=0
+fi
+fi
+if [ -s "$HOME/agsbx/sb.json" ]; then
+proxy_existing_config=1
+if [ ! -x "$HOME/agsbx/sing-box" ] || ! "$HOME/agsbx/sing-box" check -c "$HOME/agsbx/sb.json" >/dev/null 2>&1; then
+proxy_existing_valid=0
+fi
+fi
+[ -x "$HOME/bin/proxy" ] || proxy_existing_valid=0
+if [ -z "$1" ] && [ -n "${PROXY_SELECTED_KEYS# }" ] && [ "$proxy_existing_config" = 1 ] && [ "$proxy_existing_valid" != 1 ]; then
+echo "检测到上次安装未完成或配置文件已损坏，将自动修复并重新搭建。"
+PROXY_EXISTING_REBUILD=1
+export PROXY_EXISTING_REBUILD
+elif [ -z "$1" ] && [ -n "${PROXY_SELECTED_KEYS# }" ] && [ "$proxy_existing_config" = 1 ]; then
 echo "============================================================"
 echo "本服务器已安装一键搭建脚本，为避免覆盖原节点，请选择操作："
 echo "  1. 重新搭建（会替换原节点配置）"
