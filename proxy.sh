@@ -2452,22 +2452,9 @@ sbvlpt1(){
 echo "\"$hostname\","
 }
 clvlpt(){
-cat <<EOF
-- name: "$clname_vl"
-  type: vless
-  server: $server_ip                          
-  port: $port_vl_re                                
-  uuid: $uuid   
-  network: tcp
-  udp: true
-  tls: true
-$(if [ "$vl_vision_enabled" = "yes" ]; then printf '  flow: xtls-rprx-vision'; fi)
-  servername: $ym_vl_re                 
-  reality-opts: 
-    public-key: $public_key_x    
-    short-id: $short_id_x                      
-  client-fingerprint: chrome
-EOF
+vl_flow_yaml=""
+[ "$vl_vision_enabled" = "yes" ] && vl_flow_yaml=", flow: xtls-rprx-vision"
+printf '%s\n' "- { name: \"$clname_vl\", server: \"$server_ip\", port: $port_vl_re, type: vless, uuid: \"$uuid\", tls: true, tfo: false${vl_flow_yaml}, skip-cert-verify: false, reality-opts: { public-key: \"$public_key_x\", short-id: \"$short_id_x\" }, servername: \"$ym_vl_re\", client-fingerprint: chrome, network: tcp, udp: true }"
 }
 clvlpt1(){
 echo "- \"$clname_vl\""
@@ -2500,17 +2487,7 @@ sbsspt1(){
 echo "\"$hostname\","
 }
 clsspt(){
-cat <<EOF
-- name: "$clname_ss"
-  type: ss
-  server: $server_ip
-  port: $port_ss
-  cipher: aes-256-gcm
-  password: "$sskey"
-  udp: true
-  udp-over-tcp: true
-  udp-over-tcp-version: 2
-EOF
+printf '%s\n' "- { name: \"$clname_ss\", server: \"$server_ip\", port: $port_ss, type: ss, cipher: aes-256-gcm, password: \"$sskey\", udp: true, udp-over-tcp: true, udp-over-tcp-version: 2 }"
 }
 clsspt1(){
 echo "- \"$clname_ss\""
@@ -2557,23 +2534,7 @@ sbvmpt1(){
 echo "\"$hostname\","
 }
 clvmpt(){
-cat <<EOF
-- name: "$clname_vm"
-  type: vmess
-  server: $server_ip                        
-  port: $port_vm_ws                                     
-  uuid: $uuid       
-  alterId: 0
-  cipher: auto
-  udp: true
-  tls: false
-  network: ws
-  servername: www.bing.com                    
-  ws-opts:
-    path: "$uuid-vm"                             
-    headers:
-      Host: www.bing.com
-EOF
+printf '%s\n' "- { name: \"$clname_vm\", server: \"$server_ip\", port: $port_vm_ws, type: vmess, uuid: \"$uuid\", alterId: 0, cipher: auto, udp: true, tls: false, network: ws, servername: www.bing.com, ws-opts: { path: \"$uuid-vm\", headers: { Host: www.bing.com } } }"
 }
 clvmpt1(){
 echo "- \"$clname_vm\""
@@ -2615,19 +2576,7 @@ sbanpt1(){
 echo "\"$hostname\","
 }
 clanpt(){
-cat <<EOF
-- name: "$clname_an"
-  type: anytls
-  server: $server_ip
-  port: $port_an
-  password: $uuid
-  client-fingerprint: chrome
-  udp: true
-  idle-session-check-interval: 30
-  idle-session-timeout: 30
-  sni: www.bing.com
-  skip-cert-verify: true
-EOF
+printf '%s\n' "- { name: \"$clname_an\", server: \"$server_ip\", port: $port_an, type: anytls, password: \"$uuid\", client-fingerprint: chrome, udp: true, idle-session-check-interval: 30, idle-session-timeout: 30, sni: www.bing.com, skip-cert-verify: true }"
 }
 clanpt1(){
 echo "- \"$clname_an\""
@@ -2715,19 +2664,9 @@ sbhypt1(){
 echo "\"$hostname\","
 }
 clhypt(){
-cat <<EOF
-- name: "$clname_hy"
-  type: hysteria2                                      
-  server: $server_ip                              
-  port: $port_hy2
-$( [ -n "$cmhy2pt" ] && printf '  ports: "%s"\n' "$cmhy2pt" )
-  password: $uuid                          
-  alpn:
-    - h3
-  sni: www.bing.com                               
-  skip-cert-verify: true
-  fast-open: true
-EOF
+hy2_ports_yaml=""
+[ -n "$cmhy2pt" ] && hy2_ports_yaml=", ports: \"$cmhy2pt\""
+printf '%s\n' "- { name: \"$clname_hy\", server: \"$server_ip\", port: $port_hy2${hy2_ports_yaml}, type: hysteria2, password: \"$uuid\", alpn: [h3], sni: www.bing.com, skip-cert-verify: true, fast-open: true }"
 }
 clhypt1(){
 echo "- \"$clname_hy\""
@@ -2768,21 +2707,7 @@ sbtupt1(){
 echo "\"$hostname\","
 }
 cltupt(){
-cat <<EOF
-- name: "$clname_tu"
-  server: $server_ip                      
-  port: $port_tu                                    
-  type: tuic
-  uuid: $uuid       
-  password: $uuid   
-  alpn: [h3]
-  disable-sni: true
-  reduce-rtt: true
-  udp-relay-mode: native
-  congestion-controller: bbr
-  sni: www.bing.com                                
-  skip-cert-verify: true
-EOF
+printf '%s\n' "- { name: \"$clname_tu\", server: \"$server_ip\", port: $port_tu, type: tuic, uuid: \"$uuid\", password: \"$uuid\", alpn: [h3], disable-sni: true, reduce-rtt: true, udp-relay-mode: native, congestion-controller: bbr, sni: www.bing.com, skip-cert-verify: true }"
 }
 cltupt1(){
 echo "- \"$clname_tu\""
@@ -2901,38 +2826,8 @@ echo "\"$hostname\","
 echo "\"$hostname\","
 }
 clvmargopt(){
-cat <<EOF
-- name: "$clname_argo_tls"
-  type: vmess
-  server: "$cdnip1"                       
-  port: 443                                     
-  uuid: $uuid       
-  alterId: 0
-  cipher: auto
-  udp: true
-  tls: true
-  network: ws
-  servername: $argodomain                    
-  ws-opts:
-    path: "$uuid-vm"                             
-    headers:
-      Host: $argodomain
-- name: "$clname_argo"
-  type: vmess
-  server: "$cdnip2"                        
-  port: 80                                     
-  uuid: $uuid       
-  alterId: 0
-  cipher: auto
-  udp: true
-  tls: false
-  network: ws
-  servername: $argodomain                    
-  ws-opts:
-    path: "$uuid-vm"                             
-    headers:
-      Host: $argodomain
-EOF
+printf '%s\n' "- { name: \"$clname_argo_tls\", server: \"$cdnip1\", port: 443, type: vmess, uuid: \"$uuid\", alterId: 0, cipher: auto, udp: true, tls: true, network: ws, servername: \"$argodomain\", ws-opts: { path: \"$uuid-vm\", headers: { Host: \"$argodomain\" } } }"
+printf '%s\n' "- { name: \"$clname_argo\", server: \"$cdnip2\", port: 80, type: vmess, uuid: \"$uuid\", alterId: 0, cipher: auto, udp: true, tls: false, network: ws, servername: \"$argodomain\", ws-opts: { path: \"$uuid-vm\", headers: { Host: \"$argodomain\" } } }"
 }
 clvmargopt1(){
 echo "- \"$clname_argo_tls\""
@@ -2973,7 +2868,7 @@ fi
 sbxy="$(get_func sbvlpt; get_func sbsspt; get_func sbanpt; get_func sbarpt; get_func sbvmpt; get_func sbhypt; get_func sbtupt; get_func sbvmargopt)"
 clxy="$(get_func clvlpt; get_func clsspt; get_func clanpt; get_func clvmpt; get_func clhypt; get_func cltupt; get_func clvmargopt)"
 sbgz="$(get_func sbvlpt1; get_func sbsspt1; get_func sbanpt1; get_func sbarpt1; get_func sbvmpt1; get_func sbhypt1; get_func sbtupt1; get_func sbvmargopt1)"
-clgz="$({ get_func clvlpt1; get_func clsspt1; get_func clanpt1; get_func clvmpt1; get_func clhypt1; get_func cltupt1; get_func clvmargopt1; } | sed '2,$s/^/    /')"
+clgz_inline="$({ get_func clvlpt1; get_func clsspt1; get_func clanpt1; get_func clvmpt1; get_func clhypt1; get_func cltupt1; get_func clvmargopt1; } | sed 's/^- //' | paste -sd, -)"
 sbgz=$(printf "%s\n" "$sbgz" | sed '$ s/,$//')
 cat > $HOME/agsbx/sbox.json <<EOF
 {
@@ -3330,91 +3225,18 @@ proxies:
 $clxy
 
 proxy-groups:
-- name: "节点选择"
-  type: select
-  proxies:
-    - "自动选择"
-    $clgz
-    - DIRECT
-    - REJECT
-- name: "自动选择"
-  type: url-test
-  url: https://www.gstatic.com/generate_204
-  interval: 300
-  lazy: false
-  tolerance: 50
-  proxies:
-    $clgz 
-- name: "AI服务"
-  type: select
-  proxies:
-    - "节点选择"
-    $clgz
-    - DIRECT
-    - REJECT
-- name: "油管视频"
-  type: select
-  proxies:
-    - "节点选择"
-    $clgz
-    - DIRECT
-    - REJECT
-- name: "谷歌服务"
-  type: select
-  proxies:
-    - "节点选择"
-    $clgz
-    - DIRECT
-    - REJECT
-- name: "GitHub"
-  type: select
-  proxies:
-    - "节点选择"
-    $clgz
-    - DIRECT
-    - REJECT
-- name: "社交媒体"
-  type: select
-  proxies:
-    - "节点选择"
-    $clgz
-    - DIRECT
-    - REJECT
-- name: "电报消息"
-  type: select
-  proxies:
-    - "节点选择"
-    $clgz
-    - DIRECT
-    - REJECT
-- name: "私有网络"
-  type: select
-  proxies:
-    - DIRECT
-    - "节点选择"
-    $clgz
-    - REJECT
-- name: "国内服务"
-  type: select
-  proxies:
-    - DIRECT
-    - "节点选择"
-    $clgz
-    - REJECT
-- name: "非中国"
-  type: select
-  proxies:
-    - "节点选择"
-    $clgz
-    - DIRECT
-    - REJECT
-- name: "漏网之鱼"
-  type: select
-  proxies:
-    - "节点选择"
-    $clgz
-    - DIRECT
-    - REJECT
+- { name: "节点选择", type: select, proxies: ["自动选择", $clgz_inline, DIRECT, REJECT] }
+- { name: "自动选择", type: url-test, proxies: [$clgz_inline], url: https://www.gstatic.com/generate_204, interval: 300, lazy: false, tolerance: 50 }
+- { name: "AI服务", type: select, proxies: ["节点选择", $clgz_inline, DIRECT, REJECT] }
+- { name: "油管视频", type: select, proxies: ["节点选择", $clgz_inline, DIRECT, REJECT] }
+- { name: "谷歌服务", type: select, proxies: ["节点选择", $clgz_inline, DIRECT, REJECT] }
+- { name: "GitHub", type: select, proxies: ["节点选择", $clgz_inline, DIRECT, REJECT] }
+- { name: "社交媒体", type: select, proxies: ["节点选择", $clgz_inline, DIRECT, REJECT] }
+- { name: "电报消息", type: select, proxies: ["节点选择", $clgz_inline, DIRECT, REJECT] }
+- { name: "私有网络", type: select, proxies: [DIRECT, "节点选择", $clgz_inline, REJECT] }
+- { name: "国内服务", type: select, proxies: [DIRECT, "节点选择", $clgz_inline, REJECT] }
+- { name: "非中国", type: select, proxies: ["节点选择", $clgz_inline, DIRECT, REJECT] }
+- { name: "漏网之鱼", type: select, proxies: ["节点选择", $clgz_inline, DIRECT, REJECT] }
 rules:
   - RULE-SET,category-ai-!cn,AI服务
   - RULE-SET,youtube,油管视频
