@@ -1192,24 +1192,32 @@ echo
 }
 reality_candidates(){
 cat <<EOF
-www.apple.com
-xp.apple.com
-www.icloud.com
-aws.amazon.com
-www.amazon.com
-www.cloudflare.com
+www.openssl.org
+www.hostdime.com
+www.wolfram.com
+www.hetzner.com
+www.ovhcloud.com
+www.debian.org
+www.postgresql.org
 www.intel.com
 www.nvidia.com
 www.amd.com
-www.sony.com
-www.samsung.com
 www.oracle.com
-www.tesla.com
-addons.mozilla.org
-www.bing.com
-www.xbox.com
-www.lovelive-anime.jp
+www.ibm.com
+www.asus.com
+www.microchip.com
+www.arm.com
+www.analog.com
+www.mathworks.com
+www.leaseweb.com
+www.datapacket.com
 EOF
+}
+reality_target_priority(){
+case "$1" in
+www.openssl.org|www.hostdime.com|www.wolfram.com|www.hetzner.com|www.ovhcloud.com|www.debian.org|www.postgresql.org) echo 0 ;;
+*) echo 1 ;;
+esac
 }
 reality_target_ms(){
 rt_domain="$1"
@@ -1222,33 +1230,101 @@ fi
 rt_rc=$?
 rt_end=$(date +%s%3N 2>/dev/null || date +%s)
 [ "$rt_rc" = 0 ] || return 1
-echo "$rt_out" | grep -qi 'ALPN protocol: h2' || return 1
 echo "$rt_out" | grep -qi 'TLSv1.3' || return 1
+echo "$rt_out" | grep -qi 'Verify return code: 0' || return 1
 rt_ms=$((rt_end - rt_start))
 [ "$rt_ms" -ge 0 ] 2>/dev/null || return 1
 echo "$rt_ms"
+}
+reality_target_probe(){
+rt_probe_domain="$1"
+[ -x "$HOME/agsbx/xray" ] || return 2
+command -v curl >/dev/null 2>&1 || return 2
+rt_probe_dir=$(mktemp -d "${TMPDIR:-/tmp}/proxy-reality.XXXXXX") || return 2
+rt_probe_server_port=$(allocate_port) || { rm -rf "$rt_probe_dir"; return 2; }
+rt_probe_socks_port=$(allocate_port) || { rm -rf "$rt_probe_dir"; return 2; }
+while [ "$rt_probe_socks_port" = "$rt_probe_server_port" ]; do
+rt_probe_socks_port=$(allocate_port) || { rm -rf "$rt_probe_dir"; return 2; }
+done
+rt_probe_uuid=$(cat /proc/sys/kernel/random/uuid 2>/dev/null)
+rt_probe_keys=$($HOME/agsbx/xray x25519 2>/dev/null)
+rt_probe_private=$(printf '%s\n' "$rt_probe_keys" | awk -F: '/PrivateKey|Private key/ {sub(/^[[:space:]]*/, "", $2); print $2; exit}')
+rt_probe_password=$(printf '%s\n' "$rt_probe_keys" | awk -F: '/Password|PublicKey|Public key/ {sub(/^[[:space:]]*/, "", $2); print $2; exit}')
+rt_probe_sid=$(date +%s%N | sha256sum | cut -c 1-8)
+if [ -z "$rt_probe_uuid" ] || [ -z "$rt_probe_private" ] || [ -z "$rt_probe_password" ]; then
+rm -rf "$rt_probe_dir"
+return 2
+fi
+cat > "$rt_probe_dir/server.json" <<EOF
+{"log":{"loglevel":"warning"},"inbounds":[{"listen":"127.0.0.1","port":$rt_probe_server_port,"protocol":"vless","settings":{"clients":[{"id":"$rt_probe_uuid","flow":"xtls-rprx-vision"}],"decryption":"none"},"streamSettings":{"network":"tcp","security":"reality","realitySettings":{"dest":"$rt_probe_domain:443","serverNames":["$rt_probe_domain"],"privateKey":"$rt_probe_private","shortIds":["$rt_probe_sid"]}}}],"outbounds":[{"protocol":"freedom","tag":"direct"}]}
+EOF
+cat > "$rt_probe_dir/client.json" <<EOF
+{"log":{"loglevel":"warning"},"inbounds":[{"listen":"127.0.0.1","port":$rt_probe_socks_port,"protocol":"socks","settings":{"auth":"noauth","udp":false}}],"outbounds":[{"protocol":"vless","settings":{"vnext":[{"address":"127.0.0.1","port":$rt_probe_server_port,"users":[{"id":"$rt_probe_uuid","encryption":"none","flow":"xtls-rprx-vision"}]}]},"streamSettings":{"network":"tcp","security":"reality","realitySettings":{"fingerprint":"chrome","serverName":"$rt_probe_domain","password":"$rt_probe_password","shortId":"$rt_probe_sid","spiderX":"/"}}}]}
+EOF
+$HOME/agsbx/xray run -config "$rt_probe_dir/server.json" > "$rt_probe_dir/server.log" 2>&1 &
+rt_probe_server_pid=$!
+sleep 1
+if ! kill -0 "$rt_probe_server_pid" 2>/dev/null; then
+rm -rf "$rt_probe_dir"
+return 1
+fi
+$HOME/agsbx/xray run -config "$rt_probe_dir/client.json" > "$rt_probe_dir/client.log" 2>&1 &
+rt_probe_client_pid=$!
+sleep 1
+rt_probe_code=""
+for rt_probe_url in https://cp.cloudflare.com/generate_204 https://www.gstatic.com/generate_204; do
+rt_probe_code=$(curl -4 -sS --max-time 8 --socks5-hostname "127.0.0.1:$rt_probe_socks_port" -o /dev/null -w '%{http_code}' "$rt_probe_url" 2>/dev/null || true)
+[ "$rt_probe_code" = 204 ] && break
+done
+kill "$rt_probe_client_pid" "$rt_probe_server_pid" 2>/dev/null || true
+wait "$rt_probe_client_pid" "$rt_probe_server_pid" 2>/dev/null || true
+rm -rf "$rt_probe_dir"
+[ "$rt_probe_code" = 204 ]
 }
 select_reality_domain(){
 best_domain=""
 best_ms=""
 echo "正在检测 Reality 候选域名，请稍等..." >&2
+rt_rank_file=$(mktemp "${TMPDIR:-/tmp}/proxy-reality-rank.XXXXXX") || return 1
+rt_sorted_file=$(mktemp "${TMPDIR:-/tmp}/proxy-reality-sort.XXXXXX") || { rm -f "$rt_rank_file"; return 1; }
 for rt_domain in $(reality_candidates); do
 rt_ms=$(reality_target_ms "$rt_domain" 2>/dev/null || true)
 if [ -n "$rt_ms" ]; then
 echo "  可用: $rt_domain ${rt_ms}ms" >&2
+rt_priority=$(reality_target_priority "$rt_domain")
+printf '%s %s %s\n' "$rt_priority" "$rt_ms" "$rt_domain" >> "$rt_rank_file"
 if [ -z "$best_ms" ] || [ "$rt_ms" -lt "$best_ms" ] 2>/dev/null; then
 best_domain="$rt_domain"
 best_ms="$rt_ms"
 fi
 fi
 done
-if [ -n "$best_domain" ]; then
-echo "Reality优选域名：$best_domain (${best_ms}ms)" >&2
-echo "$best_domain"
-else
-echo "Reality候选域名检测失败，使用默认域名 xp.apple.com" >&2
-echo "xp.apple.com"
+if [ -z "$best_domain" ]; then
+rm -f "$rt_rank_file" "$rt_sorted_file"
+echo "Reality候选域名 TLS 检测全部失败，已停止安装，避免生成不可用节点。" >&2
+return 1
 fi
+sort -n -k1,1 -k2,2 "$rt_rank_file" > "$rt_sorted_file"
+if [ -x "$HOME/agsbx/xray" ] && command -v curl >/dev/null 2>&1; then
+echo "正在进行 Reality 真实握手验证..." >&2
+while read -r rt_priority rt_ms rt_domain; do
+[ -n "$rt_domain" ] || continue
+if reality_target_probe "$rt_domain"; then
+rm -f "$rt_rank_file" "$rt_sorted_file"
+if [ "$rt_priority" = 0 ]; then rt_level="优先候选"; else rt_level="备用候选"; fi
+echo "Reality优选域名：$rt_domain (${rt_ms}ms，$rt_level，真实握手通过)" >&2
+echo "$rt_domain"
+return 0
+fi
+echo "  跳过: $rt_domain（Reality 握手失败）" >&2
+done < "$rt_sorted_file"
+rm -f "$rt_rank_file" "$rt_sorted_file"
+echo "Reality候选域名真实握手全部失败，已停止安装，避免生成不可用节点。" >&2
+return 1
+fi
+rm -f "$rt_rank_file" "$rt_sorted_file"
+echo "Reality优选域名：$best_domain (${best_ms}ms，仅完成 TLS 检测)" >&2
+echo "$best_domain"
 }
 installxray(){
 echo
@@ -1267,7 +1343,7 @@ EOF
 insuuid
 if [ -n "$xhp" ] || [ -n "$vlp" ]; then
 if [ -z "$ym_vl_re" ]; then
-ym_vl_re=$(select_reality_domain)
+ym_vl_re=$(select_reality_domain) || return 1
 fi
 echo "$ym_vl_re" > "$HOME/agsbx/ym_vl_re"
 echo "Reality域名：$ym_vl_re"
@@ -1638,7 +1714,7 @@ fi
 if [ -n "$arp" ]; then
 arp=arpt
 if [ -z "$ym_vl_re" ]; then
-ym_vl_re=$(select_reality_domain)
+ym_vl_re=$(select_reality_domain) || return 1
 fi
 echo "$ym_vl_re" > "$HOME/agsbx/ym_vl_re"
 echo "Reality域名：$ym_vl_re"
